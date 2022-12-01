@@ -33,10 +33,12 @@ test_input() {
   echo -n "Testing running against ${TYPE} input: "
   if [ -s "${INPUT_FILE}" ]; then
     OUTPUT_TMP=$(mktemp)
-    timeout --foreground ${TIMEOUT} ${EXE} "${INPUT_FILE}" >"${OUTPUT_TMP}"
+    #timeout --foreground ${TIMEOUT} 
+    cp "${INPUT_FILE}" input
+    ${EXE} "${INPUT_FILE}" >"${OUTPUT_TMP}"
     RET=$?
     [ $RET -eq 0 ] && {
-      cat "${OUTPUT_TMP}" | diff - "${OUTPUT_FILE}" >$DIFF_TMP
+      diff "${OUTPUT_TMP}" "${OUTPUT_FILE}" >$DIFF_TMP
       [ $? -eq 0 ] && pass || {
         fail "${EXE} ${INPUT_FILE}     # Diff"
         cat $DIFF_TMP
@@ -66,22 +68,22 @@ test_inputs() {
   TIMETMP=$(mktemp)
   [ -z "${4}" -o "${4}" = "example" ] && {
     { time test_input "${EXE}" "${INPUT_PREFIX}" "${OUTPUT_PREFIX}" "example"; } 2>${TIMETMP}
-    cat ${TIMETMP} | tail -3 | head -1
+    cat ${TIMETMP} # | tail -3 | head -1
   }
   for I in $(seq 2 99); do
     [ -f "${INPUT_PREFIX}.example-${I}" ] && [ -z "${4}" -o "${4}" = "example" -o "${4}" = "example-${I}" ] && {
       { time test_input "${EXE}" "${INPUT_PREFIX}" "${OUTPUT_PREFIX}" "example-${I}"; } 2>${TIMETMP}
-      cat ${TIMETMP} | tail -3 | head -1
+      cat ${TIMETMP} # | tail -3 | head -1
     }
   done
   [ -z "${4}" -o "${4}" = "actual" ] && {
     { time test_input "${EXE}" "${INPUT_PREFIX}" "${OUTPUT_PREFIX}" "actual"; } 2>${TIMETMP}
-    cat ${TIMETMP} | tail -3 | head -1
+    cat ${TIMETMP} # | tail -3 | head -1
   }
   rm ${TIMETMP}
 }
 
-JAKT="${HOME}/src/osdev/jakt/build/bin/jakt"
+JAKT="${HOME}/Source/jakt/build/bin/jakt -R ${HOME}/Source/jakt/runtime"
 START=01
 END=25
 [ -n "$1" ] && case $1 in '' | *[!0-9]*) ;; *)

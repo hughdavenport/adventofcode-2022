@@ -18,12 +18,12 @@ function read_lines(filename: String) throws -> [String] {
 
 
 function main(args: [String]) {
-    if args.size() <= 1 {
-        eprintln("usage: {} <input file>", args[0])
-        return 1
-    }
+//    if args.size() <= 1 {
+//        eprintln("usage: {} <input file>", args[0])
+//        return 1
+//    }
 
-    for line in read_lines(filename: args[1]) {
+    for line in read_lines(filename: "input") {
         println("{}", line)
     }
 }
