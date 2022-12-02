@@ -1,0 +1,66 @@
+function read_lines(filename: String) throws -> [String] {
+    mut ret: [String] = []
+    mut file = File::open_for_reading(filename)
+    mut builder = StringBuilder::create()
+    for b in file.read_all() {
+        if b == '\n' as! u8 {
+            ret.push(builder.to_string())
+            builder = StringBuilder::create()
+        } else {
+            builder.append(b)
+        }
+    }
+    if not builder.is_empty() {
+        ret.push(builder.to_string())
+    }
+    return ret
+}
+
+function panic(anon message: String) -> never {
+    eprintln("PANIC: {}", message)
+    abort()
+}
+
+function parse(anon s: String) -> i8 {
+    let ret = match s {
+        "A"|"X" => 1 // Rock
+        "B"|"Y" => 2 // Paper
+        "C"|"Z" => 3 // Scissors
+        else => 0
+    }
+    if ret == 0 {
+        panic("invalid value")
+    }
+    return ret
+}
+
+function score(opp: i8, player: i8) -> i64 {
+    // rock < paper 
+    // paper < scissors
+    // scissors < rock
+    mut ret = player
+    if player == opp {
+        ret += 3
+    } else if (player == 1 and opp == 3)
+            or (player == 2 and opp == 1)
+            or (player == 3 and opp == 2) {
+        ret += 6
+    }
+    return ret
+}
+
+function main(args: [String]) {
+//    if args.size() <= 1 {
+//        eprintln("usage: {} <input file>", args[0])
+//        return 1
+//    }
+
+    mut total = 0
+    for line in read_lines(filename: "input") {
+        let split = line.split(' ')
+        let opp = parse(split[0])
+        let player = parse(split[1])
+        total += score(opp, player)
+    }
+    println("Part 1: {}", total)
+}
