@@ -17,31 +17,47 @@ function read_lines(filename: String) throws -> [String] {
 }
 
 
+function score(anon b: u8) -> i64 {
+    if b >= 'a' as! u8 {
+        return b + 1 - 'a' as! u8
+    } else {
+        return b + 27 - 'A' as! u8
+    }
+}
+
 function main(args: [String]) {
 //    if args.size() <= 1 {
 //        eprintln("usage: {} <input file>", args[0])
 //        return 1
 //    }
 
+    mut group: [String] = []
     mut sum = 0;
+    mut sum2 = 0;
     for line in read_lines(filename: "input") {
+        group.push(line)
+        if group.size() == 3 {
+            for i in 0..group[0].length() {
+                let sub = group[0].substring(start: i, length: 1)
+                if group[1].contains(sub) and group[2].contains(sub) {
+                    mut b = group[0].byte_at(i)
+                    sum2+= score(b)
+                    break
+                }
+            }
+            group = []
+        }
         let ln = line.length()
         let first = line.substring(start: 0, length: ln/2)
         let second = line.substring(start: ln/2, length: ln/2)
         for i in 0..first.length() {
             if second.contains(first.substring(start: i, length: 1)) {
                 mut b = first.byte_at(i)
-                if b >= 'a' as! u8 {
-                    b -= 'a' as! u8
-                    b += 1
-                } else {
-                    b -= 'A' as! u8
-                    b+= 27
-                }
-                sum += b as! i64
+                sum += score(b)
                 break
             }
         }
     }
     println("Part 1: {}", sum)
+    println("Part 2: {}", sum2)
 }
