@@ -1,0 +1,43 @@
+function read_lines(filename: String) throws -> [String] {
+    mut ret: [String] = []
+    mut file = File::open_for_reading(filename)
+    mut builder = StringBuilder::create()
+    for b in file.read_all() {
+        if b == '\n' as! u8 {
+            ret.push(builder.to_string())
+            builder = StringBuilder::create()
+        } else {
+            builder.append(b)
+        }
+    }
+    if not builder.is_empty() {
+        ret.push(builder.to_string())
+    }
+    return ret
+}
+
+
+function main(args: [String]) {
+//    if args.size() <= 1 {
+//        eprintln("usage: {} <input file>", args[0])
+//        return 1
+//    }
+
+    mut sum = 0;
+    for line in read_lines(filename: "input") {
+        mut split = line.split(',')
+        let first = split[0]
+        let second = split[1]
+        split = first.split('-')
+        let low1 = split[0].to_int()!
+        let high1 = split[1].to_int()!
+        split = second.split('-')
+        let low2 = split[0].to_int()!
+        let high2 = split[1].to_int()!
+        if (low1 >= low2 and high1 <= high2) 
+                or (low2 >= low1 and high2 <= high1) {
+            sum ++
+        }
+    }
+    println("Part 1: {}", sum)
+}

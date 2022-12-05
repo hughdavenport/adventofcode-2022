@@ -99,11 +99,18 @@ for DAY in $(seq "${START}" "${END}"); do
   }
   INPUT_PREFIX="inputs/day-${DAY}"
   OUTPUT_PREFIX="outputs/day-${DAY}"
-  echo "Testing compiling ${JAKT_FILE}: "
-  rm "./build/day-${DAY}" 2>/dev/null
-  ${JAKT} "$JAKT_FILE"
-  if [ $? -eq 0 -a -x "./build/day-${DAY}" ]; then
-    pass
+  EXE="./build/day-${DAY}"
+  if [ ! -f "$EXE" ] || [ "$JAKT_FILE" -nt "$EXE" ]; then
+    echo "Testing compiling ${JAKT_FILE}: "
+    rm "./build/day-${DAY}" 2>/dev/null
+    ${JAKT} "$JAKT_FILE"
+    if [ $? -eq 0 -a -x "$EXE" ]; then
+        pass
+    fi
+  else
+    echo "Source file ${JAKT_FILE} is older than build file ${EXE}, skipping compilation"
+  fi
+  if [ -x "$EXE" ]; then
     test_inputs "./build/day-${DAY}" "${INPUT_PREFIX}" "${OUTPUT_PREFIX}" "${2}"
     [ $SIMULATE -eq 1 ] && {
       echo "Testing interpreted mode"
