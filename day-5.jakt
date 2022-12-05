@@ -1,0 +1,78 @@
+function read_lines(filename: String) throws -> [String] {
+    mut ret: [String] = []
+    mut file = File::open_for_reading(filename)
+    mut builder = StringBuilder::create()
+    for b in file.read_all() {
+        if b == '\n' as! u8 {
+            ret.push(builder.to_string())
+            builder = StringBuilder::create()
+        } else {
+            builder.append(b)
+        }
+    }
+    if not builder.is_empty() {
+        ret.push(builder.to_string())
+    }
+    return ret
+}
+
+struct Stack {
+    data: [c_char]
+}
+
+function is_digit(anon b: u8) -> bool {
+    return b >= '0' as! u8 and b <= '9' as! u8
+}
+
+function is_space(anon b: u8) -> bool {
+    return b == ' ' as! u8
+}
+
+function main(args: [String]) {
+//    if args.size() <= 1 {
+//        eprintln("usage: {} <input file>", args[0])
+//        return 1
+//    }
+
+    mut initial = true
+    mut stacks: [Stack] = []
+    for line in read_lines(filename: "input") {
+        if line.length() == 0 {
+            initial = false
+            continue
+        }
+        if initial {
+            // 1 5 9 13
+            mut i: usize = 1
+            while i < line.length() {
+                let stack_idx = i/4
+                let b = line.byte_at(i)
+                if not is_space(b) {
+                    if is_digit(b) {
+                        break
+                    }
+                    while stack_idx >= stacks.size() {
+                        stacks.push(Stack(data: []))
+                    }
+                    stacks[stack_idx].data.insert(before_index: 0, value: b as! c_char)
+                }
+                i += 4
+            }
+        } else {
+            let split = line.split(' ')
+            // move [n] from [src] to [dst]
+            mut n = split[1].to_int()!
+            let src = split[3].to_int()!
+            let dst = split[5].to_int()!
+            while n > 0 {
+                stacks[dst-1].data.push(stacks[src-1].data.pop()!)
+                n --
+            }
+        }
+    }
+    print("Part 1: ")
+    for stack in stacks {
+        print("{}", stack.data[stack.data.size()-1])
+    }
+    println()
+}
