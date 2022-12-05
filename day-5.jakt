@@ -36,8 +36,16 @@ function main(args: [String]) {
 
     mut initial = true
     mut stacks: [Stack] = []
+    mut stacks2: [Stack] = []
     for line in read_lines(filename: "input") {
         if line.length() == 0 {
+            for stack in stacks {
+                mut data: [c_char] = []
+                for d in stack.data {
+                    data.push(d)
+                }
+                stacks2.push(Stack(data))
+            }
             initial = false
             continue
         }
@@ -64,14 +72,24 @@ function main(args: [String]) {
             mut n = split[1].to_int()!
             let src = split[3].to_int()!
             let dst = split[5].to_int()!
+            mut tmp: [c_char] = []
             while n > 0 {
                 stacks[dst-1].data.push(stacks[src-1].data.pop()!)
+                tmp.push(stacks2[src-1].data.pop()!)
                 n --
+            }
+            while tmp.size() > 0 {
+                stacks2[dst-1].data.push(tmp.pop()!)
             }
         }
     }
     print("Part 1: ")
     for stack in stacks {
+        print("{}", stack.data[stack.data.size()-1])
+    }
+    println()
+    print("Part 2: ")
+    for stack in stacks2 {
         print("{}", stack.data[stack.data.size()-1])
     }
     println()
