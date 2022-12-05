@@ -23,7 +23,8 @@ function main(args: [String]) {
 //        return 1
 //    }
 
-    mut sum = 0;
+    mut sum = 0
+    mut sum2 = 0
     for line in read_lines(filename: "input") {
         mut split = line.split(',')
         let first = split[0]
@@ -37,7 +38,14 @@ function main(args: [String]) {
         if (low1 >= low2 and high1 <= high2) 
                 or (low2 >= low1 and high2 <= high1) {
             sum ++
+            sum2 ++
+        } else if (low1 >= low2 and low1 <= high2)
+                or (low2 >= low1 and low2 <= high1)
+                or (high1 >= low2 and high1 <= high2)
+                or (high2 >= low1 and high2 <= high1) {
+            sum2 ++
         }
     }
     println("Part 1: {}", sum)
+    println("Part 2: {}", sum2)
 }
