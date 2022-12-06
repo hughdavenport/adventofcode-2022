@@ -1,0 +1,47 @@
+function read_lines(filename: String) throws -> [String] {
+    mut ret: [String] = []
+    mut file = File::open_for_reading(filename)
+    mut builder = StringBuilder::create()
+    for b in file.read_all() {
+        if b == '\n' as! u8 {
+            ret.push(builder.to_string())
+            builder = StringBuilder::create()
+        } else {
+            builder.append(b)
+        }
+    }
+    if not builder.is_empty() {
+        ret.push(builder.to_string())
+    }
+    return ret
+}
+
+function is_unique(anon s: String) -> bool {
+    if s.length() != 4 {
+        return false
+    }
+    for i in 0..3 {
+        for j in (i+1)..4 {
+            if s.byte_at(i as! usize) == s.byte_at(j as! usize) {
+                return false
+            }
+        }
+    }
+    return true
+}
+
+function main(args: [String]) {
+//    if args.size() <= 1 {
+//        eprintln("usage: {} <input file>", args[0])
+//        return 1
+//    }
+
+    let line = read_lines(filename: "input")[0]
+    for i in 4..line.length() {
+        let sub = line.substring(start: i-4, length: 4)
+        if is_unique(sub) {
+            println("Part 1: {}", i)
+            break
+        }
+    }
+}
