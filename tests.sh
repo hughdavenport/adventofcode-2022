@@ -5,9 +5,9 @@ SIMULATE=0
 TIMEOUT="5m"
 
 # Colors for printing pass/fail
-GREEN=$(tput setaf 64)
-RED=$(tput setaf 160)
-RESET=$(tput sgr0)
+GREEN=$(echo -e "\e[32;1m")
+RED=$(echo -e "\e[31;1m")
+RESET=$(echo -e "\e[0m")
 pass() {
   echo "${GREEN}PASS${RESET}"
 }
