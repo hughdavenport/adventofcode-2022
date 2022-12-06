@@ -17,11 +17,8 @@ function read_lines(filename: String) throws -> [String] {
 }
 
 function is_unique(anon s: String) -> bool {
-    if s.length() != 4 {
-        return false
-    }
-    for i in 0..3 {
-        for j in (i+1)..4 {
+    for i in 0..(s.length()-1) {
+        for j in (i+1)..s.length() {
             if s.byte_at(i as! usize) == s.byte_at(j as! usize) {
                 return false
             }
@@ -44,4 +41,12 @@ function main(args: [String]) {
             break
         }
     }
+    for i in 14..line.length() {
+        let sub = line.substring(start: i-14, length: 14)
+        if is_unique(sub) {
+            println("Part 2: {}", i)
+            break
+        }
+    }
+    
 }
