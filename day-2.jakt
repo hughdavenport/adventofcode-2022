@@ -1,20 +1,4 @@
-function read_lines(filename: String) throws -> [String] {
-    mut ret: [String] = []
-    mut file = File::open_for_reading(filename)
-    mut builder = StringBuilder::create()
-    for b in file.read_all() {
-        if b == '\n' as! u8 {
-            ret.push(builder.to_string())
-            builder = StringBuilder::create()
-        } else {
-            builder.append(b)
-        }
-    }
-    if not builder.is_empty() {
-        ret.push(builder.to_string())
-    }
-    return ret
-}
+import helpers { read_lines }
 
 function panic(anon message: String) -> never {
     eprintln("PANIC: {}", message)
@@ -64,11 +48,6 @@ function solve2(opp: i8, player: i8) -> i8 {
 }
 
 function main(args: [String]) {
-//    if args.size() <= 1 {
-//        eprintln("usage: {} <input file>", args[0])
-//        return 1
-//    }
-
     mut total1 = 0
     mut total2 = 0
     for line in read_lines(filename: "input") {

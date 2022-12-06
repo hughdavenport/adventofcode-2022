@@ -1,20 +1,4 @@
-function read_lines(filename: String) throws -> [String] {
-    mut ret: [String] = []
-    mut file = File::open_for_reading(filename)
-    mut builder = StringBuilder::create()
-    for b in file.read_all() {
-        if b == '\n' as! u8 {
-            ret.push(builder.to_string())
-            builder = StringBuilder::create()
-        } else {
-            builder.append(b)
-        }
-    }
-    if not builder.is_empty() {
-        ret.push(builder.to_string())
-    }
-    return ret
-}
+import helpers { read_lines }
 
 struct Stack {
     data: [c_char]
@@ -29,11 +13,6 @@ function is_space(anon b: u8) -> bool {
 }
 
 function main(args: [String]) {
-//    if args.size() <= 1 {
-//        eprintln("usage: {} <input file>", args[0])
-//        return 1
-//    }
-
     mut initial = true
     mut stacks: [Stack] = []
     mut stacks2: [Stack] = []
