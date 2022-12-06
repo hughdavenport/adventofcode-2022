@@ -5,5 +5,5 @@ Working on [Advent of Code 2022](https://adventofcode.com/2022) in the [jakt pro
 Videos documenting the process are available on [YouTube](https://www.youtube.com/playlist?list=PL5r5Q39GjMDcwBb9stbIusb4hfUdJWdhW).
 
 ![](https://img.shields.io/badge/day%20📅-6-blue)
-![](https://img.shields.io/badge/stars%20⭐-10-yellow)
-![](https://img.shields.io/badge/days%20completed-5-red)
+![](https://img.shields.io/badge/stars%20⭐-12-yellow)
+![](https://img.shields.io/badge/days%20completed-6-red)
