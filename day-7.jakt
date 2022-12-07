@@ -1,41 +1,72 @@
 import helpers { read_lines }
 
-function parse_listing(mut dir: Directory, ls: String) {
-    // is is a dir
-    // is it a file, with filesize
-    // hack, treat file as a dir with 0 entries, could also put a flag that it is a file?
-
+function parse_listing(mut cwd: Directory, line: String) throws {
+    if line.starts_with("dir") {
+        let dir = line.substring(start: 4, length: line.length()-4)
+        cwd.entries[dir] = Directory(entries: Dictionary<String, Directory>(), sizes: Dictionary<String, i32>())
+    } else {
+        let split = line.split(' ')
+        cwd.sizes[split[1]] = split[0].to_int()!
+    }
 }
 
 function is_command(anon s: String) -> bool {
     return s.starts_with("$")
 }
 
+function dir_size(dir: Directory) -> i32 {
+    mut ret: i32 = 0
+    for entry in dir.entries {
+        ret += dir_size(dir: entry.1)
+    }
+    for size in dir.sizes {
+        ret += size.1
+    }
+    return ret
+}
+
+function part1(dir: Directory) -> i32 {
+    mut ret: i32 = 0
+    let size = dir_size(dir)
+    if size <= 100000 {
+        ret += size
+    }
+    for entry in dir.entries {
+        ret += part1(dir: entry.1)
+    }
+    return ret
+}
+
 struct Directory {
     entries: Dictionary<String, Directory>
-    size: i64
-    // TODO entries should point to a directory OR a file size
-    // could also just have a flag?
+    sizes: Dictionary<String, i32>
 }
 
 function main(args: [String]) {
-    mut root: Directory = Directory(entries: Dictionary<String, Directory>(), size: 0)
+    mut root: Directory = Directory(entries: Dictionary<String, Directory>(), sizes: Dictionary<String, i32>())
     mut cwd: Directory = root
+    mut last_dirs: [Directory] = []
     for line in read_lines(filename: "input") {
         if is_command(line) {
             let cmd = line.substring(start: 2, length: line.length()-2)
             if cmd.starts_with("cd") {
                 let dir = cmd.substring(start: 3, length: cmd.length()-3)
-                println("cd {}", dir)
-                // TODO find dir in cwd, then add a ".." that points to cwd, then change cwd
-                // TODO if dir is just "..", then just go to that dir
+                if dir == ".." {
+                    cwd = last_dirs.pop()!
+                } else if dir == "/" {
+                    cwd = root
+                } else {
+                    last_dirs.push(cwd)
+                    cwd = cwd.entries[dir]
+                }
             } else if cmd.starts_with("ls") {
                 // can ignore I think
             } else {
                 eprintln("Unknown command {}", cmd)
             }
         } else {
-            parse_listing(dir: cwd, ls: line)
+            parse_listing(cwd, line)
         }
     }
+    println("Part 1: {}", part1(dir: root))
 }
