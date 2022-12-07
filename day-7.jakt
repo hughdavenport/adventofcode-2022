@@ -37,6 +37,20 @@ function part1(dir: Directory) -> i32 {
     return ret
 }
 
+function part2(dir: Directory, size: i32) -> i32 {
+    mut ret = dir_size(dir)
+    if ret < size {
+        return 0
+    }
+    for entry in dir.entries {
+        let inner = part2(dir: entry.1, size)
+        if inner != 0 and inner < ret {
+            ret = inner
+        }
+    }
+    return ret
+}
+
 struct Directory {
     entries: Dictionary<String, Directory>
     sizes: Dictionary<String, i32>
@@ -69,4 +83,7 @@ function main(args: [String]) {
         }
     }
     println("Part 1: {}", part1(dir: root))
+    let free_space = 70000000 - dir_size(dir: root)
+    let need_to_del = 30000000 - free_space
+    println("Part 2: {}", part2(dir: root, size: need_to_del))
 }
