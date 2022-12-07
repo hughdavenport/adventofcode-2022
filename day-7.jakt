@@ -1,0 +1,41 @@
+import helpers { read_lines }
+
+function parse_listing(mut dir: Directory, ls: String) {
+    // is is a dir
+    // is it a file, with filesize
+    // hack, treat file as a dir with 0 entries, could also put a flag that it is a file?
+
+}
+
+function is_command(anon s: String) -> bool {
+    return s.starts_with("$")
+}
+
+struct Directory {
+    entries: Dictionary<String, Directory>
+    size: i64
+    // TODO entries should point to a directory OR a file size
+    // could also just have a flag?
+}
+
+function main(args: [String]) {
+    mut root: Directory = Directory(entries: Dictionary<String, Directory>(), size: 0)
+    mut cwd: Directory = root
+    for line in read_lines(filename: "input") {
+        if is_command(line) {
+            let cmd = line.substring(start: 2, length: line.length()-2)
+            if cmd.starts_with("cd") {
+                let dir = cmd.substring(start: 3, length: cmd.length()-3)
+                println("cd {}", dir)
+                // TODO find dir in cwd, then add a ".." that points to cwd, then change cwd
+                // TODO if dir is just "..", then just go to that dir
+            } else if cmd.starts_with("ls") {
+                // can ignore I think
+            } else {
+                eprintln("Unknown command {}", cmd)
+            }
+        } else {
+            parse_listing(dir: cwd, ls: line)
+        }
+    }
+}
