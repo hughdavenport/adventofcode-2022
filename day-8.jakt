@@ -1,0 +1,124 @@
+import helpers { read_lines }
+
+function scenic_score(map: [[u8]], x: usize, y: usize) throws -> i64 {
+    mut ret = 1
+    let size = map[y][x]
+    mut num = 0
+    mut _x: i64 = (x as! i64)-1
+    mut _y: i64 = y as! i64
+    while _x >= 0 {
+        num ++
+        if size <= map[_y][_x] {
+            break
+        }
+        _x --
+    }
+    ret *= num
+    num = 0
+    _x = (x as! i64) +1
+    while _x < map[y].size() as! i64 {
+        num ++
+        if size <= map[_y][_x] {
+            break
+        }
+        _x ++
+    }
+    ret *= num
+    num = 0
+    _x = x as! i64
+    _y = (y as! i64) -1
+    while _y >= 0 {
+        num ++
+        if size <= map[_y][_x] {
+            break
+        }
+        _y --
+    }
+    ret *= num
+    num = 0
+    _y = (y as! i64)+1
+    while _y < map.size() as! i64 {
+        num ++
+        if size <= map[_y][_x] {
+            break
+        }
+        _y ++
+    }
+    ret *= num
+    return ret
+}
+
+function is_visible(map: [[u8]], x: usize, y: usize) throws -> bool {
+    if x == 0 or x == map[y].size()-1 or y == 0 or y == map.size()-1 {
+        return true
+    }
+    let size = map[y][x]
+    mut ret = true
+    for _x in 0..x {
+        if size <= map[y][_x] {
+            ret = false
+            break
+        }
+    }
+    if ret {
+        return ret
+    }
+    ret = true
+    for _x in (x+1)..map[y].size() {
+        if size <= map[y][_x] {
+            ret = false
+            break
+        }
+    }
+    if ret {
+        return ret
+    }
+    ret = true
+    for _y in 0..y {
+        if size <= map[_y][x] {
+            ret = false
+            break
+        }
+    }
+    if ret {
+        return ret
+    }
+    ret = true
+    for _y in (y+1)..map.size() {
+        if size <= map[_y][x] {
+            ret = false
+            break
+        }
+    }
+    return ret
+}
+
+function main(args: [String]) {
+    mut map: [[u8]] = []
+    for line in read_lines(filename: "input") {
+        mut row: [u8] = []
+        for i in 0..line.length() {
+            row.push(line.byte_at(i) - '0' as! u8)
+        }
+        map.push(row)
+    }
+    mut num = 0
+    for y in 0..map.size() {
+        for x in 0..map[y].size() {
+            if is_visible(map, x, y) {
+                num ++
+            }
+        }
+    }
+    println("Part 1: {}", num)
+    mut max = 0
+    for y in 0..map.size() {
+        for x in 0..map[y].size() {
+            let score = scenic_score(map, x, y)
+            if score > max {
+                max = score
+            }
+        }
+    }
+    println("Part 2: {}", max)
+}
