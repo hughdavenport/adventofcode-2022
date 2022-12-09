@@ -58,13 +58,24 @@ function move_point(p: Point, dir: Direction) -> Point {
     )
 }
 
-function move_rope(head: Point, tail: Point, dir: Direction) -> (Point, Point) {
-    let new_head = move_point(p: head, dir)
+function move_rope(new_head: Point, tail: Point) -> Point {
     if new_head.is_touching(tail) {
-        return (new_head, tail)
+        return tail
     }
     if new_head.is_two_away(tail) {
-        return (new_head, move_point(p: tail, dir))
+        if new_head.x == tail.x {
+            if new_head.y < tail.y {
+                return move_point(p: tail, dir: Direction::Up)
+            } else {
+                return move_point(p: tail, dir: Direction::Down)
+            }
+        } else {
+             if new_head.x < tail.x {
+                return move_point(p: tail, dir: Direction::Left)
+            } else {
+                return move_point(p: tail, dir: Direction::Right)
+            }
+        }
     }
     mut new_tail = Point(x: tail.x, y: tail.y)
     if new_tail.x < new_head.x {
@@ -82,25 +93,33 @@ function move_rope(head: Point, tail: Point, dir: Direction) -> (Point, Point) {
         abort()
     }
 
-    return (new_head, new_tail)
+    return new_tail
 }
 
 function main(args: [String]) {
-    mut visited: Dictionary<i64, bool> = Dictionary<i64, bool>()
+    mut visited: Set<i64> = {}
+    mut visited2: Set<i64> = {}
+    mut rope: [Point] = []
+    for i in 0..10 {
+        rope.push(Point(x: 0, y: 0))
+    }
     mut head = Point(x: 0, y: 0)
     mut tail = Point(x: 0, y: 0)
-    visited[tail.to_i64()] = true
+    visited.add(tail.to_i64())
     mut width = 0uz
     for line in read_lines(filename: "input") {
         let split = line.split(' ')
         let dir = Direction::parse(split[0].byte_at(0))
         let count = split[1].to_int()!
         for i in 0..count {
-            let ret = move_rope(head, tail, dir)
-            head = ret.0
-            tail = ret.1
-            visited[tail.to_i64()] = true
+            rope[0] = move_point(p: rope[0], dir)
+            for j in 1..rope.size() {
+                rope[j] = move_rope(new_head: rope[j-1], tail: rope[j])
+            }
+            visited.add(rope[1].to_i64())
+            visited2.add(rope[9].to_i64())
         }
     }
     println("Part 1: {}", visited.size())
+    println("Part 2: {}", visited2.size())
 }
