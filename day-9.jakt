@@ -1,0 +1,106 @@
+import helpers { read_lines, abs }
+
+struct Point {
+    x: i64
+    y: i64
+
+    function from_i64(anon i: i64) -> Point {
+        // TODO
+        eprintln("TODO: Point::from_i64")
+        abort()
+    }
+
+    function to_i64(this) -> i64 {
+        // FIXME magic value
+        return this.y * 100000 + this.x
+    }
+
+    function is_touching(this, anon p: Point) -> bool {
+        return abs(this.x - p.x) <= 1 and abs(this.y - p.y) <= 1
+    }
+
+    function is_two_away(this, anon p: Point) -> bool {
+        return (this.x == p.x and abs(this.y-p.y) == 2) or
+            (this.y == p.y and abs(this.x-p.x) == 2)
+    }
+}
+
+enum Direction {
+    Up
+    Down
+    Left
+    Right
+    Unknown
+
+    function parse(anon c: u8) -> Direction {
+        return match c {
+            b'U' => Direction::Up
+            b'D' => Direction::Down
+            b'L' => Direction::Left
+            b'R' => Direction::Right
+            else => Direction::Unknown
+        }
+    }
+}
+
+function move_point(p: Point, dir: Direction) -> Point {
+    return Point(
+        x: p.x + match dir {
+            Direction::Left => -1
+            Direction::Right => 1
+            else => 0
+        },
+        y: p.y + match dir {
+            Direction::Up => -1
+            Direction::Down => 1
+            else => 0
+        }
+    )
+}
+
+function move_rope(head: Point, tail: Point, dir: Direction) -> (Point, Point) {
+    let new_head = move_point(p: head, dir)
+    if new_head.is_touching(tail) {
+        return (new_head, tail)
+    }
+    if new_head.is_two_away(tail) {
+        return (new_head, move_point(p: tail, dir))
+    }
+    mut new_tail = Point(x: tail.x, y: tail.y)
+    if new_tail.x < new_head.x {
+        new_tail = move_point(p: new_tail, dir: Direction::Right)
+    } else {
+        new_tail = move_point(p: new_tail, dir: Direction::Left)
+    }
+    if new_tail.y < new_head.y {
+        new_tail = move_point(p: new_tail, dir: Direction::Down)
+    } else {
+        new_tail = move_point(p: new_tail, dir: Direction::Up)
+    }
+
+    if not new_head.is_touching(new_tail) {
+        abort()
+    }
+
+    return (new_head, new_tail)
+}
+
+function main(args: [String]) {
+    mut visited: Dictionary<i64, bool> = Dictionary<i64, bool>()
+    mut head = Point(x: 0, y: 0)
+    mut tail = Point(x: 0, y: 0)
+    visited[tail.to_i64()] = true
+    mut width = 0uz
+    for line in read_lines(filename: "input") {
+        let split = line.split(' ')
+        let dir = Direction::parse(split[0].byte_at(0))
+        let count = split[1].to_int()!
+        for i in 0..count {
+            let ret = move_rope(head, tail, dir)
+            head = ret.0
+            tail = ret.1
+            visited[tail.to_i64()] = true
+        }
+    }
+    println("Part 1: {}", visited.size())
+}

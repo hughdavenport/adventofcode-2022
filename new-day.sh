@@ -35,5 +35,6 @@ pushd $(dirname "${0}") >/dev/null
 }
 vim "outputs/day-${DAY}.example"
 git add "day-${DAY}.jakt" "inputs/day-${DAY}.*" "outputs/day-${DAY}.*"
-vim "day-${DAY}.jakt"
+#vim "day-${DAY}.jakt"
+echo "You can now edit 'day-${DAY}.jakt'"
 popd >/dev/null
