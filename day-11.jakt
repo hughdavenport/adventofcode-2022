@@ -1,0 +1,102 @@
+import helpers { read_lines }
+
+class Monkey {
+    items: [i64]? = None
+    op: String = ""
+    test: i64 = 0
+    test_true: i64 = 0
+    test_false: i64 = 0
+    processed: i64 = 0
+
+    public function parse(anon s: String) throws -> Monkey {
+        // Monkey i:
+        //      Starting items: x, y, ...
+        //      Operation: new = op         (e.g. old*19)
+        //      Test: divisible by i
+        //          If true: throw to monkey i
+        //          If false: throw to monkey i
+
+        mut ret = Monkey()
+        let lines = s.split('\n')
+        let items_s = lines[1].split(':')[1].split(',')
+        mut items: [i64] = []
+        for i in items_s {
+            items.push(i.to_int()! as! i64)
+        }
+        ret.items = items
+        ret.op = lines[2].split('=')[1]
+        ret.test = lines[3].split(':')[1].split(' ')[2].to_int()! as! i64
+        ret.test_true = lines[4].split(':')[1].split(' ')[3].to_int()! as! i64
+        ret.test_false = lines[5].split(':')[1].split(' ')[3].to_int()! as! i64
+        return ret
+    }
+
+    function applyOp(this, anon old: i64) throws -> i64? {
+        mut ret = 0
+        let split = this.op.split(' ')
+        let (lhs_s, op, rhs_s) = (split[0], split[1], split[2])
+        mut lhs = match lhs_s {
+            "old" => old
+            else => lhs_s.to_int()! as! i64
+        }
+        mut rhs = match rhs_s {
+            "old" => old
+            else => rhs_s.to_int()! as! i64
+        }
+        return match op {
+            "*" => lhs * rhs
+            "+" => lhs + rhs
+            else => None
+        }
+    }
+
+    public function process(mut this, mut monkeys: [Monkey]) throws {
+        for i in this.items! {
+            this.processed ++
+            mut level = this.applyOp(i)! / 3
+            if level % this.test == 0 {
+                monkeys[this.test_true].items!.push(level)
+            } else {
+                monkeys[this.test_false].items!.push(level)
+            }
+        }
+        this.items!.resize(0)
+    }
+
+    public function part1(monkeys: [Monkey]) -> i64 {
+        mut max1 = 0
+        mut max2 = 0
+        for monkey in monkeys {
+            if monkey.processed > max1 {
+                max2 = max1
+                max1 = monkey.processed
+            } else if monkey.processed > max2 {
+                max2 = monkey.processed
+            }
+        }
+        return max1 * max2
+    }
+}
+
+
+function main(args: [String]) {
+    mut tmp = ""
+    mut monkeys: [Monkey] = []
+    for line in read_lines(filename: "input") {
+        if line.length() == 0 {
+            monkeys.push(Monkey::parse(tmp))
+            tmp = ""
+        } else {
+            tmp += line + "\n"
+        }
+    }
+    monkeys.push(Monkey::parse(tmp))
+
+    for round in 0..20 {
+        for monkey in monkeys {
+            monkey.process(monkeys)
+        }
+    }
+
+    println("Part 1: {}", Monkey::part1(monkeys))
+}
