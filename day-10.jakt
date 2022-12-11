@@ -1,0 +1,73 @@
+import helpers { read_lines }
+
+enum OpCode {
+    Addx(value: i32)
+    Noop(s: String)
+
+    function parse(anon s: String) throws -> OpCode? {
+        let args = s.split(' ')
+        return match args[0] {
+            "addx" => OpCode::Addx(value: args[1].to_int()!)
+            "noop" => OpCode::Noop(s)
+            else => None
+        }
+    }
+}
+
+struct Instruction {
+    opcode: OpCode
+    cycles: u64
+
+    function parse(anon s: String) throws -> Instruction {
+        let opcode = OpCode::parse(s)
+        mut cycles = 0u64
+        if opcode.has_value() {
+            match opcode! {
+                Addx(value) => {
+                    cycles = 2u64
+                }
+                Noop(s) => {
+                    cycles = 1u64
+                }
+            }
+        } else {
+            eprintln("Invalid instruction: {}", s)
+            abort()
+        }
+        return Instruction(opcode: opcode!, cycles)
+    }
+}
+
+struct Cpu {
+    x: i32 = 1i32
+    clock: u16 = 0u16
+
+    function tick(mut this, mut i: Instruction) {
+        i.cycles -= 1
+        if i.cycles == 0 {
+            match i.opcode {
+                Addx(value) => {
+                    this.x += value
+                }
+                Noop => {}
+            }
+        }
+        this.clock ++
+    }
+}
+
+function main(args: [String]) {
+    mut cpu = Cpu()
+    mut part1 = 0i32
+    for line in read_lines(filename: "input") {
+        mut i = Instruction::parse(line)
+        while i.cycles != 0 {
+            println("i = {}, cpu = {}", i, cpu)
+            if [20, 60, 100, 140, 180, 220].contains(cpu.clock as! i64) {
+               part1 += cpu.clock as! i32 * cpu.x
+            }
+            cpu.tick(i)
+        }
+    }
+    println("Part 1: {}", part1)
+}
