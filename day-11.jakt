@@ -1,9 +1,10 @@
 import helpers { read_lines }
 
 class Monkey {
-    items: [i64]? = None
+    id: i64 = 0
+    items: [u64]? = None
     op: String = ""
-    test: i64 = 0
+    test: u64 = 0u64
     test_true: i64 = 0
     test_false: i64 = 0
     processed: i64 = 0
@@ -18,30 +19,61 @@ class Monkey {
 
         mut ret = Monkey()
         let lines = s.split('\n')
+        ret.id = lines[0].split(' ')[1].split(':')[0].to_int()! as! i64
         let items_s = lines[1].split(':')[1].split(',')
-        mut items: [i64] = []
+        mut items: [u64] = []
         for i in items_s {
-            items.push(i.to_int()! as! i64)
+            items.push(i.to_int()! as! u64)
         }
         ret.items = items
         ret.op = lines[2].split('=')[1]
-        ret.test = lines[3].split(':')[1].split(' ')[2].to_int()! as! i64
+        ret.test = lines[3].split(':')[1].split(' ')[2].to_int()! as! u64
         ret.test_true = lines[4].split(':')[1].split(' ')[3].to_int()! as! i64
         ret.test_false = lines[5].split(':')[1].split(' ')[3].to_int()! as! i64
         return ret
     }
 
-    function applyOp(this, anon old: i64) throws -> i64? {
+    function to_string(this) throws -> String {
+        // Monkey i:
+        //      Starting items: x, y, ...
+        //      Operation: new = op         (e.g. old*19)
+        //      Test: divisible by i
+        //          If true: throw to monkey i
+        //          If false: throw to monkey i
+        
+        mut builder = StringBuilder::create()
+        // FIXME: store the monkey id on parse, then use here
+        builder.append_string(format("Monkey {}\n", this.id))
+        builder.append_string("  Starting items: ")
+        mut first = true
+        for i in this.items! {
+            if not first {
+                builder.append_string(", ")
+            } else {
+                first = false
+            }
+            builder.append_string(format("{}", i))
+        }
+        builder.append_string("\n")
+        builder.append_string(format("  Operation: new ={}\n", this.op))
+        builder.append_string(format("  Test: divisible by {}\n", this.test))
+        builder.append_string(format("    If true: throw to monkey {}\n", this.test_true))
+        builder.append_string(format("    If false: throw to monkey {}\n", this.test_false))
+
+        return builder.to_string()
+    }
+
+    function applyOp(this, anon old: u64) throws -> u64? {
         mut ret = 0
         let split = this.op.split(' ')
         let (lhs_s, op, rhs_s) = (split[0], split[1], split[2])
         mut lhs = match lhs_s {
             "old" => old
-            else => lhs_s.to_int()! as! i64
+            else => lhs_s.to_int()! as! u64
         }
         mut rhs = match rhs_s {
             "old" => old
-            else => rhs_s.to_int()! as! i64
+            else => rhs_s.to_int()! as! u64
         }
         return match op {
             "*" => lhs * rhs
@@ -50,10 +82,17 @@ class Monkey {
         }
     }
 
-    public function process(mut this, mut monkeys: [Monkey]) throws {
+    public function process(mut this, mut monkeys: [Monkey], div: bool = true) throws {
+        // TODO fix overflows
+        // my idea is that we collect the product of all the test divisions
+        // then after applying op, mod it by that product
+        // then do the division test on our specific test
         for i in this.items! {
             this.processed ++
-            mut level = this.applyOp(i)! / 3
+            mut level = this.applyOp(i)!
+            if div {
+                level /= 3
+            }
             if level % this.test == 0 {
                 monkeys[this.test_true].items!.push(level)
             } else {
@@ -63,7 +102,7 @@ class Monkey {
         this.items!.resize(0)
     }
 
-    public function part1(monkeys: [Monkey]) -> i64 {
+    public function monkey_business(monkeys: [Monkey]) -> i64 {
         mut max1 = 0
         mut max2 = 0
         for monkey in monkeys {
@@ -75,6 +114,14 @@ class Monkey {
             }
         }
         return max1 * max2
+    }
+
+    public function clone(this) throws -> Monkey {
+        return Monkey::parse(this.to_string())
+    }
+
+    public function print_processed(this) {
+        println("Monkey {} inspected items {} times.", this.id, this.processed)
     }
 }
 
@@ -92,11 +139,30 @@ function main(args: [String]) {
     }
     monkeys.push(Monkey::parse(tmp))
 
+    mut monkeys2: [Monkey] = []
+    for monkey in monkeys {
+        monkeys2.push(monkey.clone())
+    }
+
     for round in 0..20 {
         for monkey in monkeys {
             monkey.process(monkeys)
         }
     }
 
-    println("Part 1: {}", Monkey::part1(monkeys))
+    println("Part 1: {}", Monkey::monkey_business(monkeys))
+
+    for round in 0..10000 {
+        if round % 1000 == 0 {
+            println("== After round {} ==", round)
+            for monkey in monkeys2 {
+                monkey.print_processed()
+            }
+        }
+        for monkey in monkeys2 {
+            monkey.process(monkeys: monkeys2, div: false)
+        }
+    }
+
+    println("Part 2: {}", Monkey::monkey_business(monkeys: monkeys2))
 }
