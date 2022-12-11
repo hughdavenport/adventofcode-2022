@@ -40,10 +40,9 @@ struct Instruction {
 
 struct Cpu {
     x: i32 = 1i32
-    clock: u16 = 0u16
+    clock: u16 = 1u16
 
-    function tick(mut this, mut i: Instruction) {
-        i.cycles -= 1
+    function tick(mut this, i: Instruction) {
         if i.cycles == 0 {
             match i.opcode {
                 Addx(value) => {
@@ -62,11 +61,11 @@ function main(args: [String]) {
     for line in read_lines(filename: "input") {
         mut i = Instruction::parse(line)
         while i.cycles != 0 {
-            println("i = {}, cpu = {}", i, cpu)
-            if [20, 60, 100, 140, 180, 220].contains(cpu.clock as! i64) {
-               part1 += cpu.clock as! i32 * cpu.x
-            }
+            i.cycles --
             cpu.tick(i)
+            if [20, 60, 100, 140, 180, 220].contains(cpu.clock as! i64) {
+                part1 += cpu.clock as! i32 * cpu.x
+            }
         }
     }
     println("Part 1: {}", part1)

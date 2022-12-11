@@ -49,7 +49,7 @@ test_input() {
         echo "Timeout"
       } || {
         fail "${EXE} ${INPUT_FILE}     # Ret $RET"
-      	cat "${OUTPUT_FILE}"
+      	cat "${OUTPUT_TMP}"
         echo "Bad return $RET"
       }
     }
