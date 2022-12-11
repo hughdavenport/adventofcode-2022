@@ -1,13 +1,13 @@
-import helpers { read_lines }
+import helpers { read_lines, abs }
 
 enum OpCode {
-    Addx(value: i32)
+    Addx(value: i64)
     Noop(s: String)
 
     function parse(anon s: String) throws -> OpCode? {
         let args = s.split(' ')
         return match args[0] {
-            "addx" => OpCode::Addx(value: args[1].to_int()!)
+            "addx" => OpCode::Addx(value: args[1].to_int()! as! i64)
             "noop" => OpCode::Noop(s)
             else => None
         }
@@ -39,10 +39,15 @@ struct Instruction {
 }
 
 struct Cpu {
-    x: i32 = 1i32
+    x: i64 = 1
     clock: u16 = 1u16
 
-    function tick(mut this, i: Instruction) {
+    function tick(mut this, i: Instruction, mut vga: Vga) {
+        let vga_x = (this.clock-1) as! usize % vga.WIDTH
+        let vga_y = (this.clock-1) as! usize / vga.WIDTH
+        if abs(vga_x as! i64 - this.x) <= 1 {
+            vga.draw_pixel(x: vga_x, y: vga_y, pixel: b'#')
+        }
         if i.cycles == 0 {
             match i.opcode {
                 Addx(value) => {
@@ -55,18 +60,52 @@ struct Cpu {
     }
 }
 
+class Vga {
+    pixels: [u8]? = None
+
+    public WIDTH: usize = 40uz
+    public HEIGHT: usize = 6uz
+
+    public function init(mut this) throws {
+        mut pixels: [u8] = []
+        for y in 0..this.HEIGHT {
+            for x in 0..this.WIDTH {
+                pixels.push(b'.')
+            }
+        }
+        this.pixels = pixels
+    }
+
+    public function draw_pixel(mut this, x: usize, y: usize, pixel: u8) {
+        this.pixels![this.WIDTH*y+x] = pixel
+    }
+
+    public function print(this) {
+        for y in 0..this.HEIGHT {
+            for x in 0..this.WIDTH {
+                print("{:c}", this.pixels![this.WIDTH*y+x])
+            }
+            println()
+        }
+    }
+}
+
 function main(args: [String]) {
     mut cpu = Cpu()
-    mut part1 = 0i32
+    mut vga = Vga()
+    vga.init()
+    mut part1 = 0
     for line in read_lines(filename: "input") {
         mut i = Instruction::parse(line)
         while i.cycles != 0 {
             i.cycles --
-            cpu.tick(i)
+            cpu.tick(i, vga)
             if [20, 60, 100, 140, 180, 220].contains(cpu.clock as! i64) {
-                part1 += cpu.clock as! i32 * cpu.x
+                part1 += cpu.clock as! i64 * cpu.x
             }
         }
     }
     println("Part 1: {}", part1)
+    println("Part 2:")
+    vga.print()
 }
