@@ -3,10 +3,11 @@ import helpers { read_lines, abs }
 struct Grid {
     data: [[u8]]
 
-    function parse(lines: [String]) throws -> (Grid, Point, Point) {
+    function parse(lines: [String]) throws -> (Grid, Point, Point, [Point]) {
         mut data: [[u8]] = []
         mut start: Point? = None
         mut goal: Point? = None
+        mut lowest_points: [Point] = []
         for line in lines {
             mut row: [u8] = []
             for i in 0..line.length() {
@@ -15,17 +16,23 @@ struct Grid {
                     b'S' => {
                         start = Point(x: i as! i64, y: data.size() as! i64)
                         row.push(0u8)
+                        lowest_points.push(start!)
                     }
                     b'E' => {
                         goal = Point(x: i as! i64, y: data.size() as! i64)
                         row.push(25u8)
                     }
-                    else => row.push(b - b'a')
+                    else => {
+                        if b == b'a' {
+                            lowest_points.push(Point(x: i as! i64, y: data.size() as! i64))
+                        }
+                        row.push(b - b'a')
+                    }
                 }
             }
             data.push(row)
         }
-        return (Grid(data), start!, goal!)
+        return (Grid(data), start!, goal!, lowest_points)
     }
 
     function at(this, p: Point) -> u8 {
@@ -85,6 +92,9 @@ function h(p: Point, goal: Point) -> i64 {
 }
 
 function get_lowest(open: Set<i64>, fs: Dictionary<i64, i64?>) -> i64 {
+    // FIXME: Implement a min-heap or priority queue to reduce this
+    // to O(log(n)). Currently it is O(n), n being around 130 for input
+    // this is also run many times in the a_star function
     mut min_i: i64? = None
     mut min: i64? = None
     for i in open {
@@ -97,8 +107,7 @@ function get_lowest(open: Set<i64>, fs: Dictionary<i64, i64?>) -> i64 {
     return min_i!
 }
 
-function main(args: [String]) {
-    let (grid, start, goal) = Grid::parse(lines: read_lines(filename: "input"))
+function a_star(grid: Grid, start: Point, goal: Point) throws -> i64? {
     mut open: Set<i64> = {start.to_i64(grid)}
     mut gs = Dictionary<i64, i64?>()
     gs[start.to_i64(grid)] = 0
@@ -108,8 +117,7 @@ function main(args: [String]) {
         let current_i = get_lowest(open, fs)
         let current = Point::from_i64(current_i, grid)
         if current.eq(goal) {
-            println("Part 1: {}", gs[current_i]!)
-            break
+            return gs[current_i]
         }
         open.remove(current_i)
         for n in current.neighbours(grid) {
@@ -124,4 +132,18 @@ function main(args: [String]) {
             }
         }
     }
+    return None
+}
+
+function main(args: [String]) {
+    let (grid, start, goal, lowest_points) = Grid::parse(lines: read_lines(filename: "input"))
+    mut min = a_star(grid, start, goal)!
+    println("Part 1: {}", min)
+    for p in lowest_points {
+        let d = a_star(grid, start: p, goal)
+        if d.has_value() and d! < min {
+            min = d!
+        }
+    }
+    println("Part 2: {}", min)
 }
