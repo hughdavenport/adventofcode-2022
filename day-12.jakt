@@ -1,0 +1,127 @@
+import helpers { read_lines, abs }
+
+struct Grid {
+    data: [[u8]]
+
+    function parse(lines: [String]) throws -> (Grid, Point, Point) {
+        mut data: [[u8]] = []
+        mut start: Point? = None
+        mut goal: Point? = None
+        for line in lines {
+            mut row: [u8] = []
+            for i in 0..line.length() {
+                let b = line.byte_at(i)
+                match b {
+                    b'S' => {
+                        start = Point(x: i as! i64, y: data.size() as! i64)
+                        row.push(0u8)
+                    }
+                    b'E' => {
+                        goal = Point(x: i as! i64, y: data.size() as! i64)
+                        row.push(25u8)
+                    }
+                    else => row.push(b - b'a')
+                }
+            }
+            data.push(row)
+        }
+        return (Grid(data), start!, goal!)
+    }
+
+    function at(this, p: Point) -> u8 {
+        return this.data[p.y][p.x]
+    }
+
+    function height(this) -> i64 {
+        return this.data.size() as! i64
+    }
+
+    function width(this) -> i64 {
+        return this.data[0].size() as! i64
+    }
+}
+
+struct Point {
+    x: i64
+    y: i64
+
+    function neighbours(this, grid: Grid) throws -> [Point] {
+        mut ret: [Point] = []
+        let current = grid.at(p: this)
+        mut p = Point(x: this.x-1, y: this.y)
+        if p.x >= 0 and grid.at(p) <= current + 1 {
+            ret.push(p)
+        }
+        p = Point(x: this.x, y: this.y-1)
+        if p.y >= 0 and grid.at(p) <= current + 1 {
+            ret.push(p)
+        }
+        p = Point(x: this.x+1, y: this.y)
+        if p.x < grid.width() and grid.at(p) <= current + 1 {
+            ret.push(p)
+        }
+        p = Point(x: this.x, y: this.y+1)
+        if p.y < grid.height() and grid.at(p) <= current + 1 {
+            ret.push(p)
+        }
+        return ret
+    }
+
+    function from_i64(anon i: i64, grid: Grid) -> Point {
+        return Point(x: i % grid.width(), y: i / grid.width())
+    }
+
+    function to_i64(this, grid: Grid) -> i64 {
+        return this.y * grid.width() + this.x
+    }
+
+    function eq(this, anon p: Point) -> bool {
+        return this.x == p.x and this.y == p.y
+    }
+}
+
+function h(p: Point, goal: Point) -> i64 {
+    return abs(p.x - goal.x) + abs(p.y - goal.y)
+}
+
+function get_lowest(open: Set<i64>, fs: Dictionary<i64, i64?>) -> i64 {
+    mut min_i: i64? = None
+    mut min: i64? = None
+    for i in open {
+        let f = fs[i]
+        if f.has_value() and (not min.has_value() or f! < min!) {
+            min = f!
+            min_i = i
+        }
+    }
+    return min_i!
+}
+
+function main(args: [String]) {
+    let (grid, start, goal) = Grid::parse(lines: read_lines(filename: "input"))
+    mut open: Set<i64> = {start.to_i64(grid)}
+    mut gs = Dictionary<i64, i64?>()
+    gs[start.to_i64(grid)] = 0
+    mut fs = Dictionary<i64, i64?>()
+    fs[start.to_i64(grid)] = h(p: start, goal)
+    while not open.is_empty() {
+        let current_i = get_lowest(open, fs)
+        let current = Point::from_i64(current_i, grid)
+        if current.eq(goal) {
+            println("Part 1: {}", gs[current_i]!)
+            break
+        }
+        open.remove(current_i)
+        for n in current.neighbours(grid) {
+            let n_i = n.to_i64(grid)
+            let g = gs[current_i]! + 1
+            if not gs.contains(n_i) or g < gs[n_i]! {
+                gs[n_i] = g
+                fs[n_i] = g + h(p: n, goal)
+                if not open.contains(n_i) {
+                    open.add(n_i)
+                }
+            }
+        }
+    }
+}
