@@ -4,7 +4,7 @@ class Monkey {
     id: i64 = 0
     items: [u64]? = None
     op: String = ""
-    test: u64 = 0u64
+    public test: u64 = 0u64
     test_true: i64 = 0
     test_false: i64 = 0
     processed: i64 = 0
@@ -40,7 +40,7 @@ class Monkey {
         //      Test: divisible by i
         //          If true: throw to monkey i
         //          If false: throw to monkey i
-        
+
         mut builder = StringBuilder::create()
         // FIXME: store the monkey id on parse, then use here
         builder.append_string(format("Monkey {}\n", this.id))
@@ -82,16 +82,14 @@ class Monkey {
         }
     }
 
-    public function process(mut this, mut monkeys: [Monkey], div: bool = true) throws {
-        // TODO fix overflows
-        // my idea is that we collect the product of all the test divisions
-        // then after applying op, mod it by that product
-        // then do the division test on our specific test
+    public function process(mut this, mut monkeys: [Monkey], mod: u64 = 0) throws {
         for i in this.items! {
             this.processed ++
             mut level = this.applyOp(i)!
-            if div {
+            if mod == 0 {
                 level /= 3
+            } else {
+                level %= mod
             }
             if level % this.test == 0 {
                 monkeys[this.test_true].items!.push(level)
@@ -140,8 +138,10 @@ function main(args: [String]) {
     monkeys.push(Monkey::parse(tmp))
 
     mut monkeys2: [Monkey] = []
+    mut mod = 1u64
     for monkey in monkeys {
         monkeys2.push(monkey.clone())
+        mod *= monkey.test
     }
 
     for round in 0..20 {
@@ -153,14 +153,8 @@ function main(args: [String]) {
     println("Part 1: {}", Monkey::monkey_business(monkeys))
 
     for round in 0..10000 {
-        if round % 1000 == 0 {
-            println("== After round {} ==", round)
-            for monkey in monkeys2 {
-                monkey.print_processed()
-            }
-        }
         for monkey in monkeys2 {
-            monkey.process(monkeys: monkeys2, div: false)
+            monkey.process(monkeys: monkeys2, mod)
         }
     }
 
