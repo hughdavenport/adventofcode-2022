@@ -42,7 +42,6 @@ class Monkey {
         //          If false: throw to monkey i
 
         mut builder = StringBuilder::create()
-        // FIXME: store the monkey id on parse, then use here
         builder.append_string(format("Monkey {}\n", this.id))
         builder.append_string("  Starting items: ")
         mut first = true
