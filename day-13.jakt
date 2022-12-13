@@ -115,8 +115,32 @@ struct Packet {
     }
 }
 
+function sort(anon mut ps: [Packet]) throws {
+    // FIXME do something better than bubble sort
+    let n = ps.size()
+    mut swapped = true
+    while swapped {
+        swapped = false
+        for i in 1..n {
+            if ps[i-1].compare(ps[i]) > 0 {
+                let p = ps[i-1]
+                ps[i-1] = ps[i]
+                ps[i] = p
+                swapped = true
+            }
+        }
+    }
+}
+
+function print_packets(anon ps: [Packet]) throws {
+    for p in ps {
+        println(p.to_string())
+    }
+}
+
 function main(args: [String]) {
     mut packets: [Packet] = []
+    mut all_packets: [Packet] = []
     mut i = 1
     mut sum = 0
     for line in read_lines(filename: "input") {
@@ -127,11 +151,28 @@ function main(args: [String]) {
             packets = []
             i++
         } else {
-            packets.push(Packet::parse(line))
+            let p = Packet::parse(line)
+            packets.push(p)
+            all_packets.push(p)
         }
     }
     if packets[0].compare(packets[1]) <= 0 {
         sum += i
     }
     println("Part 1: {}", sum)
+    sort(all_packets)
+    let p1 = Packet::parse("[[2]]")
+    let p2 = Packet::parse("[[6]]")
+    mut part2 = 1
+    mut i2: usize = 0uz
+    while i2 < all_packets.size() and all_packets[i2].compare(p1) < 0 {
+        i2++
+    }
+    i2++
+    part2 *= i2 as! i64
+    while i2 < all_packets.size() and all_packets[i2].compare(p2) < 0 {
+        i2++
+    }
+    part2 *= (i2+2) as! i64
+    println("Part 2: {}", part2)
 }
