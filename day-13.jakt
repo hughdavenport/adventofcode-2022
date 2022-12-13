@@ -1,8 +1,8 @@
 import helpers { read_lines }
 
 enum PacketData {
-    Int(i: i64)
-    List(l: [PacketData])
+    Int(i64)
+    List([PacketData])
 
     function find_end_bracket(anon s: String) throws -> usize {
         mut stack: [usize] = []
@@ -71,6 +71,32 @@ enum PacketData {
              yield builder.to_string()
         }
     }
+
+    function compare(this, anon d: PacketData) throws -> i64 => match this {
+        Int(i) => match d {
+            Int(i2) => i - i2
+            List(l) => PacketData::List(l: [this]).compare(d)
+        }
+        List(left) => match d {
+            Int(i) => this.compare(PacketData::List(l: [d]))
+            List(right) => {
+                mut i: usize = 0uz
+                mut ret = 0
+                while ret == 0 and i < left.size() and i < right.size() {
+                    ret = left[i].compare(right[i])
+                    i++
+                }
+                if ret == 0 and left.size() != right.size() {
+                    if i < left.size() {
+                        ret = 1
+                    } else if i < right.size() {
+                        ret = -1
+                    }
+                }
+                yield ret
+            }
+        }
+    }
 }
 
 struct Packet {
@@ -83,19 +109,29 @@ struct Packet {
     function to_string(this) throws -> String {
         return this.data.to_string()
     }
+
+    function compare(this, anon p: Packet) throws -> i64 {
+        return this.data.compare(p.data)
+    }
 }
 
 function main(args: [String]) {
     mut packets: [Packet] = []
+    mut i = 1
+    mut sum = 0
     for line in read_lines(filename: "input") {
         if line.length() == 0 {
-            // do something with packets
-            println("packets =\n{}\n{}\n", packets[0].to_string(), packets[1].to_string())
+            if packets[0].compare(packets[1]) <= 0 {
+                sum += i
+            }
             packets = []
+            i++
         } else {
             packets.push(Packet::parse(line))
         }
     }
-    println("packets =\n{}\n{}\n", packets[0].to_string(), packets[1].to_string())
-    println("Part 1:")
+    if packets[0].compare(packets[1]) <= 0 {
+        sum += i
+    }
+    println("Part 1: {}", sum)
 }
