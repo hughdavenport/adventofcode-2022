@@ -1,0 +1,101 @@
+import helpers { read_lines }
+
+enum PacketData {
+    Int(i: i64)
+    List(l: [PacketData])
+
+    function find_end_bracket(anon s: String) throws -> usize {
+        mut stack: [usize] = []
+        stack.push(0uz)
+        mut i: usize = 1uz
+        while not stack.is_empty() {
+            match s.byte_at(i) {
+                b'[' => {stack.push(i)}
+                b']' => {let unused=stack.pop()}
+                else => {}
+            }
+            i++
+        }
+        return i-1
+    }
+
+    function parse(anon s: String) throws -> (PacketData, String) => match s.byte_at(0) {
+        b'[' => {
+            let i = find_end_bracket(s)
+            mut sub = s.substring(start: 1, length: i-1)
+            mut l: [PacketData] = []
+            while sub.length() > 0 {
+                let ret = PacketData::parse(sub)
+                l.push(ret.0)
+                sub = ret.1
+            }
+            mut rest: String = ""
+            if i + 1 != s.length() {
+                rest = s.substring(start: i+2, length: s.length()-i-2)
+            }
+            yield (PacketData::List(l), rest)
+        }
+        else => {
+            mut i: usize = 0
+            while i < s.length() {
+                if s.byte_at(i) == b',' {
+                    break
+                }
+                i++
+            }
+            let num = s.substring(start: 0, length: i)
+            let data = PacketData::Int(i: num.to_int()! as! i64)
+            mut rest: String = ""
+            if i != s.length() {
+                 rest = s.substring(start: i+1, length: s.length()-i-1)
+            }
+            yield (data, rest)
+        }
+    }
+
+    function to_string(this) throws -> String => match this {
+        Int(i) => format("{}", i)
+        List(l) => {
+            mut builder = StringBuilder::create()
+            builder.append_string("[")
+            mut first = true
+            for d in l {
+                if first {
+                    first = false
+                } else {
+                    builder.append_string(",")
+                }
+                 builder.append_string(d.to_string())
+             }
+             builder.append_string("]")
+             yield builder.to_string()
+        }
+    }
+}
+
+struct Packet {
+    data: PacketData
+
+    function parse(anon s: String) throws -> Packet {
+        return Packet(data: PacketData::parse(s).0)
+    }
+
+    function to_string(this) throws -> String {
+        return this.data.to_string()
+    }
+}
+
+function main(args: [String]) {
+    mut packets: [Packet] = []
+    for line in read_lines(filename: "input") {
+        if line.length() == 0 {
+            // do something with packets
+            println("packets =\n{}\n{}\n", packets[0].to_string(), packets[1].to_string())
+            packets = []
+        } else {
+            packets.push(Packet::parse(line))
+        }
+    }
+    println("packets =\n{}\n{}\n", packets[0].to_string(), packets[1].to_string())
+    println("Part 1:")
+}
