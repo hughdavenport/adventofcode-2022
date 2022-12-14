@@ -1,0 +1,183 @@
+import helpers { read_lines }
+
+struct Point {
+    x: i64
+    y: i64
+
+    function parse(anon s: String) throws -> Point {
+        let split = s.split(',')
+        return Point(
+            x: split[0].to_int()! as! i64,
+            y: split[1].to_int()! as! i64
+        )
+    }
+}
+
+struct Box {
+    origin: Point
+    corner: Point
+
+    function adjust_bounds(mut this, anon p: Point) {
+        if p.x < this.origin.x {
+            this.origin.x = p.x
+        }
+        if p.y < this.origin.y {
+            this.origin.y = p.y
+        }
+        if p.x > this.corner.x {
+            this.corner.x = p.x
+        }
+        if p.y > this.corner.y {
+            this.corner.y = p.y
+        }
+    }
+
+    function adjust_bounds(mut this, anon b: Box) {
+        this.adjust_bounds(b.origin)
+        this.adjust_bounds(b.corner)
+    }
+
+    function size(this) -> usize {
+        return this.width() * this.height()
+    }
+
+    function width(this) -> usize {
+        return (this.corner.x - this.origin.x) as! usize
+    }
+
+    function height(this) -> usize {
+        return (this.corner.y - this.origin.y) as! usize
+    }
+
+    function normalise(this, x: i64, y: i64) -> usize {
+        let (_x, _y) = (
+            (y - this.origin.y) as! usize,
+            (x - this.origin.x) as! usize
+        )
+        return _y * this.width() + _x
+    }
+
+    function increase(mut this) {
+        this.corner.x ++
+        this.corner.y ++
+    }
+
+    function increase_for_overflow(mut this) {
+        this.origin.x --
+        this.corner.x ++
+        this.corner.y ++
+    }
+}
+
+struct Path {
+    points: [Point]
+    box: Box
+
+    function parse(anon s: String) throws -> Path {
+        mut points: [Point] = []
+        mut box: Box? = None
+        let split = s.split('>')
+        for p_s in split {
+            let p = Point::parse(p_s.split(' ')[0])
+            points.push(p)
+            if not box.has_value() {
+                box = Box(origin: p, corner: p)
+            } else {
+                box!.adjust_bounds(p)
+            }
+        }
+        return Path(points, box: box!)
+    }
+}
+
+struct SandMap {
+    box: Box
+    sand: Point
+    grid: [u8]
+
+    function parse(anon lines: [String]) throws -> SandMap {
+        mut paths: [Path] = []
+        mut box: Box? = None
+        for line in lines {
+            let path = Path::parse(line)
+            paths.push(path)
+            if not box.has_value() {
+                box = path.box
+            } else {
+                box!.adjust_bounds(path.box)
+            }
+        }
+
+        let sand = Point(x: 500, y: 0)
+        box!.adjust_bounds(sand)
+        box!.increase()
+        mut grid: [u8] = [b'.'; box!.size()]
+        mut map = SandMap(box: box!, sand: sand, grid)
+        grid[map.idx(x: sand.x, y: sand.y)] = b'+'
+        for p in paths {
+            map.draw_path(p)
+        }
+        return map
+    }
+
+    function idx(this, x: i64, y: i64) -> usize {
+        return this.box.normalise(x, y)
+    }
+
+    function get(this, x: i64, y: i64) -> u8 {
+        return this.grid[this.idx(x, y)]
+    }
+
+    function set(mut this, x: i64, y: i64, anon val: u8) {
+        this.grid[this.idx(x, y)] = val
+    }
+
+    function draw_path(mut this, p: Path) {
+        for i in 1..p.points.size() {
+            this.draw_line(p1: p.points[i-1], p2: p.points[i])
+        }
+    }
+
+    function draw_line(mut this, p1: Point, p2: Point) {
+        if p1.x == p2.x {
+            let x = p1.x
+            mut low_y = p1.y
+            mut high_y = p2.y
+            if high_y < low_y {
+                low_y = p2.y
+                high_y = p1.y
+            }
+            for y in low_y..(high_y+1) {
+                this.set(x, y, b'#')
+            }
+        } else if p1.y == p2.y {
+            let y = p1.y
+            mut low_x = p1.x
+            mut high_x = p2.x
+            if high_x < low_x {
+                low_x = p2.x
+                high_x = p1.x
+            }
+            for x in low_x..(high_x+1) {
+                this.set(x, y, b'#')
+            }
+        } else {
+            eprintln("diagonal lines not supported")
+            abort()
+        }
+    }
+
+    function print(this) throws {
+        for y in this.box.origin.y..this.box.corner.y {
+            for x in this.box.origin.x..this.box.corner.x {
+                print("{:c}", this.get(x, y))
+            }
+            println()
+        }
+    }
+}
+
+function main(args: [String]) {
+    mut map = SandMap::parse(read_lines(filename: "input"))
+    map.print()
+}
