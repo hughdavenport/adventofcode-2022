@@ -90,10 +90,24 @@ struct Path {
     }
 }
 
+enum Thing {
+    EMPTY
+    PATH
+    START
+    SAND
+
+    function to_byte(this) -> u8 => match this {
+        EMPTY => b'.'
+        PATH => b'#'
+        START => b'+'
+        SAND => b'o'
+    }
+}
+
 struct SandMap {
     box: Box
     sand: Point
-    grid: [u8]
+    grid: [Thing]
 
     function parse(anon lines: [String]) throws -> SandMap {
         mut paths: [Path] = []
@@ -111,10 +125,10 @@ struct SandMap {
         let sand = Point(x: 500, y: 0)
         box!.adjust_bounds(sand)
         box!.increase()
-        mut grid: [u8] = [b'.'; box!.size()]
         box!.increase_for_overflow()
+        mut grid: [Thing] = [Thing::EMPTY(); box!.size()]
         mut map = SandMap(box: box!, sand: sand, grid)
-        grid[map.idx(x: sand.x, y: sand.y)] = b'+'
+        grid[map.idx(x: sand.x, y: sand.y)] = Thing::START()
         for p in paths {
             map.draw_path(p)
         }
@@ -125,11 +139,11 @@ struct SandMap {
         return this.box.normalise(x, y)
     }
 
-    function get(this, x: i64, y: i64) -> u8 {
+    function get(this, x: i64, y: i64) -> Thing {
         return this.grid[this.idx(x, y)]
     }
 
-    function set(mut this, x: i64, y: i64, anon val: u8) {
+    function set(mut this, x: i64, y: i64, anon val: Thing) {
         this.grid[this.idx(x, y)] = val
     }
 
@@ -149,7 +163,7 @@ struct SandMap {
                 high_y = p1.y
             }
             for y in low_y..(high_y+1) {
-                this.set(x, y, b'#')
+                this.set(x, y, Thing::PATH())
             }
         } else if p1.y == p2.y {
             let y = p1.y
@@ -160,7 +174,7 @@ struct SandMap {
                 high_x = p1.x
             }
             for x in low_x..(high_x+1) {
-                this.set(x, y, b'#')
+                this.set(x, y, Thing::PATH())
             }
         } else {
             eprintln("diagonal lines not supported")
