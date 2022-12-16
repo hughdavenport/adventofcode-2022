@@ -67,6 +67,12 @@ struct Box {
         this.corner.x ++
         this.corner.y ++
     }
+
+    function increase_for_part2(mut this, y: i64) {
+        this.origin.x -= 500
+        this.corner.x += 500
+        this.corner.y = y
+    }
 }
 
 struct Path {
@@ -125,13 +131,19 @@ struct SandMap {
         let sand = Point(x: 500, y: 0)
         box!.adjust_bounds(sand)
         box!.increase()
+        let y = box!.corner.y
         box!.increase_for_overflow()
+        box!.increase_for_part2(y: y+2)
         mut grid: [Thing] = [Thing::EMPTY(); box!.size()]
         mut map = SandMap(box: box!, sand: sand, grid)
         grid[map.idx(x: sand.x, y: sand.y)] = Thing::START()
         for p in paths {
             map.draw_path(p)
         }
+        map.draw_line(
+            p1: Point(x: box!.origin.x, y: y+1),
+            p2: Point(x: box!.corner.x, y: y+1)
+        )
         return map
     }
 
@@ -219,7 +231,7 @@ struct SandMap {
             }
         }
         this.set(x, y, Thing::SAND())
-        if y == this.box.corner.y - 1 {
+        if x == 500 and y == 0 {
             return None
         }
         return Point(x, y)
@@ -232,7 +244,7 @@ function main(args: [String]) {
     mut map = SandMap::parse(read_lines(filename: "input"))
     mut count = 0
     mut bold = map.simulate()
-    while bold.has_value() {
+    while bold.has_value() and bold!.y != map.box.height() as! i64 - 3 {
         count ++
         //print("\e[2J") // clear screen
         //map.print(bold)
@@ -240,4 +252,13 @@ function main(args: [String]) {
         bold = map.simulate()
     }
     println("Part 1: {}", count)
+    while bold.has_value() {
+        count ++
+        //print("\e[2J") // clear screen
+        //map.print(bold)
+        //system("sleep 0.1s".c_string())
+        bold = map.simulate()
+    }
+    count++
+    println("Part 2: {}", count)
 }
