@@ -42,17 +42,17 @@ struct Box {
     }
 
     function width(this) -> usize {
-        return (this.corner.x - this.origin.x) as! usize
+        return (this.corner.x - this.origin.x + 1) as! usize
     }
 
     function height(this) -> usize {
-        return (this.corner.y - this.origin.y) as! usize
+        return (this.corner.y - this.origin.y + 1) as! usize
     }
 
     function normalise(this, x: i64, y: i64) -> usize {
         let (_x, _y) = (
-            (y - this.origin.y) as! usize,
-            (x - this.origin.x) as! usize
+            (x - this.origin.x) as! usize,
+            (y - this.origin.y) as! usize
         )
         return _y * this.width() + _x
     }
@@ -112,6 +112,7 @@ struct SandMap {
         box!.adjust_bounds(sand)
         box!.increase()
         mut grid: [u8] = [b'.'; box!.size()]
+        box!.increase_for_overflow()
         mut map = SandMap(box: box!, sand: sand, grid)
         grid[map.idx(x: sand.x, y: sand.y)] = b'+'
         for p in paths {
