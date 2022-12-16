@@ -182,17 +182,62 @@ struct SandMap {
         }
     }
 
-    function print(this) throws {
+    function print(this, bold: Point? = None) throws {
         for y in this.box.origin.y..this.box.corner.y {
             for x in this.box.origin.x..this.box.corner.x {
-                print("{:c}", this.get(x, y))
+                mut fmt = "{:c}"
+                if bold.has_value() and x == bold!.x and y == bold!.y {
+                    fmt = format("\e[1m{}\e[m", fmt)
+                }
+                print(fmt, this.get(x, y).to_byte())
             }
             println()
         }
     }
+
+    function simulate(mut this, debug: bool = false) throws -> Point? {
+        mut (x, y) = (this.sand.x, this.sand.y)
+        mut moved = true
+        while moved and y < this.box.corner.y as! i64 - 1 {
+            moved = false
+            if this.get(x, y: y+1) is EMPTY() {
+                y++
+                moved = true
+            } else if this.get(x: x-1, y: y+1) is EMPTY() {
+                x--
+                y++
+                moved = true
+            } else if this.get(x: x+1, y: y+1) is EMPTY() {
+                x++
+                y++
+                moved = true
+            }
+            if moved and debug {
+                this.set(x, y, Thing::SAND())
+                this.print(bold: Point(x, y))
+                this.set(x, y, Thing::EMPTY())
+            }
+        }
+        this.set(x, y, Thing::SAND())
+        if y == this.box.corner.y - 1 {
+            return None
+        }
+        return Point(x, y)
+    }
 }
+
+import jakt::libc::io { system }
 
 function main(args: [String]) {
     mut map = SandMap::parse(read_lines(filename: "input"))
-    map.print()
+    mut count = 0
+    mut bold = map.simulate()
+    while bold.has_value() {
+        count ++
+        //print("\e[2J") // clear screen
+        //map.print(bold)
+        //system("sleep 0.1s".c_string())
+        bold = map.simulate()
+    }
+    println("Part 1: {}", count)
 }
