@@ -22,3 +22,17 @@ function abs(anon i: i64) -> i64 {
     }
     return i
 }
+
+function min(anon a: i64, anon b: i64) -> i64 {
+    if a < b {
+        return a
+    }
+    return b
+}
+
+function max(anon a: i64, anon b: i64) -> i64 {
+    if a > b {
+        return a
+    }
+    return b
+}

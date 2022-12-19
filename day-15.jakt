@@ -1,0 +1,57 @@
+import helpers { read_lines, abs, min, max }
+
+struct Point {
+    x: i64
+    y: i64
+
+    function distance(this, anon p: Point) -> i64 {
+        return abs(this.x-p.x)+abs(this.y-p.x)
+    }
+}
+
+struct Sensor {
+    sensor: Point
+    beacon: Point
+
+    function parse(anon s: String) throws -> Sensor {
+        let split = s.split('=')
+        let sensor = Point(
+            x: split[1].split(',')[0].to_int()! as! i64,
+            y: split[2].split(':')[0].to_int()! as! i64
+        )
+        let beacon = Point(
+            x: split[3].split(',')[0].to_int()! as! i64,
+            y: split[4].to_int()! as! i64
+        )
+        return Sensor(sensor, beacon)
+    }
+
+    function distance(this) -> i64 {
+        return this.sensor.distance(this.beacon)
+    }
+}
+
+function print_map(sensors: [Sensor]) throws {
+    mut x1 = sensors[0].sensor.x
+    mut x2 = sensors[0].sensor.x
+    mut y1 = sensors[0].sensor.y
+    mut y2 = sensors[0].sensor.y
+    for s in sensors {
+        x1 = min(x1, s.sensor.x)
+        x1 = min(x1, s.beacon.x)
+        y1 = min(y1, s.sensor.y)
+        y1 = min(y1, s.beacon.y)
+        x2 = max(x2, s.sensor.x)
+        x2 = max(x2, s.beacon.x)
+        y2 = max(y2, s.sensor.y)
+        y2 = max(y2, s.beacon.y)
+    }
+    // TODO finish this
+}
+
+function main(args: [String]) {
+    mut sensors: [Sensor] = []
+    for line in read_lines(filename: "input") {
+        sensors.push(Sensor::parse(line))
+    }
+}
