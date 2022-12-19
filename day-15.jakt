@@ -31,22 +31,82 @@ struct Sensor {
     }
 }
 
-function print_map(sensors: [Sensor]) throws {
-    mut x1 = sensors[0].sensor.x
-    mut x2 = sensors[0].sensor.x
-    mut y1 = sensors[0].sensor.y
-    mut y2 = sensors[0].sensor.y
-    for s in sensors {
-        x1 = min(x1, s.sensor.x)
-        x1 = min(x1, s.beacon.x)
-        y1 = min(y1, s.sensor.y)
-        y1 = min(y1, s.beacon.y)
-        x2 = max(x2, s.sensor.x)
-        x2 = max(x2, s.beacon.x)
-        y2 = max(y2, s.sensor.y)
-        y2 = max(y2, s.beacon.y)
+struct Box {
+    origin: Point
+    corner: Point
+
+    function adjust_bounds(mut this, anon p: Point) {
+        if p.x < this.origin.x {
+            this.origin.x = p.x
+        }
+        if p.y < this.origin.y {
+            this.origin.y = p.y
+        }
+        if p.x > this.corner.x {
+            this.corner.x = p.x
+        }
+        if p.y > this.corner.y {
+            this.corner.y = p.y
+        }
     }
-    // TODO finish this
+
+    function adjust_bounds(mut this, anon b: Box) {
+        this.adjust_bounds(b.origin)
+        this.adjust_bounds(b.corner)
+    }
+
+    function size(this) -> usize {
+        return this.width() * this.height()
+    }
+
+    function width(this) -> usize {
+        return (this.corner.x - this.origin.x + 1) as! usize
+    }
+
+    function height(this) -> usize {
+        return (this.corner.y - this.origin.y + 1) as! usize
+    }
+
+    function normalise(this, x: i64, y: i64) -> usize {
+        let (_x, _y) = (
+            (x - this.origin.x) as! usize,
+            (y - this.origin.y) as! usize
+        )
+        return _y * this.width() + _x
+    }
+}
+
+enum Thing {
+    SENSOR
+    BEACON
+    UNAVAILABLE
+    EMPTY
+
+    function to_byte(this) -> u8 => match this {
+        SENSOR => b'S'
+        BEACON => b'B'
+        UNAVAILABLE => b'#'
+        EMPTY => b'.'
+    }
+}
+
+function print_map(sensors: [Sensor]) throws {
+    mut box: Box = Box(origin: sensors[0].sensor, corner: sensors[0].sensor)
+    for s in sensors {
+        box.adjust_bounds(s.sensor)
+        box.adjust_bounds(s.beacon)
+    }
+    mut grid: [Thing] = [Thing::EMPTY(); box.size()]
+    for s in sensors {
+        grid[box.normalise(x: s.sensor.x, y: s.sensor.y)] = Thing::SENSOR()
+        grid[box.normalise(x: s.beacon.x, y: s.beacon.y)] = Thing::BEACON()
+    }
+    for y in 0..box.height() {
+        for x in 0..box.width() {
+            print("{:c}", grid[y*box.width()+x].to_byte())
+        }
+        println()
+    }
 }
 
 function main(args: [String]) {
@@ -54,4 +114,5 @@ function main(args: [String]) {
     for line in read_lines(filename: "input") {
         sensors.push(Sensor::parse(line))
     }
+    print_map(sensors)
 }
