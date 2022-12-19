@@ -84,6 +84,10 @@ struct Box {
         )
         return _y * this.width() + _x
     }
+
+    function in_bounds(this, x: i64, y: i64) -> bool {
+        return this.origin.x <= x and this.corner.x >= x and this.origin.y <= y and this.corner.y >= y
+    }
 }
 
 enum Thing {
@@ -124,12 +128,18 @@ function fill_row(y: i64, mut row: [Thing], sensors: [Sensor], box: Box) {
     }
 }
 
-function print_map(sensors: [Sensor], box: Box) throws {
+function print_map(sensors: [Sensor], box: Box, bold: Box) throws {
     for y in 0..box.height() {
         mut row: [Thing] = [Thing::EMPTY(); box.width()]
         fill_row(y: (y as! i64) + box.origin.y, row, sensors, box)
         for x in 0..box.width() {
+            if bold.in_bounds(x: (x as! i64) + box.origin.x, y: (y as! i64) + box.origin.y) {
+                print("\e[1;31m")
+            }
             print("{:c}", row[x].to_byte())
+            if bold.in_bounds(x: (x as! i64) + box.origin.x, y: (y as! i64) + box.origin.y) {
+                print("\e[0m")
+            }
         }
         println()
     }
@@ -145,10 +155,13 @@ function main(args: [String]) {
         box.adjust_bounds(s.bounds())
     }
     mut y = 2000000
+    mut search_box = Box(origin: Point(x: 0, y: 0), corner: Point(x: 4000000, y: 4000000))
     if box.height() < 2000000 {
         // example input
-        //print_map(sensors, box)
         y = 10
+        search_box.corner.x = 20
+        search_box.corner.y = 20
+        //print_map(sensors, box, bold: search_box)
     }
     mut row: [Thing] = [Thing::EMPTY(); box.width()]
     fill_row(y, row, sensors, box)
@@ -159,4 +172,20 @@ function main(args: [String]) {
         }
     }
     println("Part 1: {}", box.width()-count - 1)
+    for y in 0..(search_box.corner.y+1) {
+        mut found = false
+        row = [Thing::EMPTY(); box.width()]
+        fill_row(y, row, sensors, box)
+        for x in 0..(search_box.corner.x+1) {
+            let idx = box.normalise(x, y: box.origin.y)
+            if row[idx] is EMPTY() {
+                println("Part 2: {}", x*4000000+y)
+                found = true
+                break
+            }
+        }
+        if found {
+            break
+        }
+    }
 }
