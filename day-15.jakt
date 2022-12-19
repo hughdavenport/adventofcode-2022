@@ -100,32 +100,36 @@ enum Thing {
     }
 }
 
-function print_map(sensors: [Sensor]) throws {
-    mut box: Box = Box(origin: sensors[0].sensor, corner: sensors[0].sensor)
+function fill_row(y: i64, mut row: [Thing], sensors: [Sensor], box: Box) {
     for s in sensors {
-        box.adjust_bounds(s.bounds())
-    }
-    mut grid: [Thing] = [Thing::EMPTY(); box.size()]
-    for s in sensors {
-        grid[box.normalise(x: s.sensor.x, y: s.sensor.y)] = Thing::SENSOR()
-        grid[box.normalise(x: s.beacon.x, y: s.beacon.y)] = Thing::BEACON()
+        if y == s.sensor.y {
+            row[box.normalise(x: s.sensor.x, y: box.origin.y)] = Thing::SENSOR()
+        }
+        if y == s.beacon.y {
+            row[box.normalise(x: s.beacon.x, y: box.origin.y)] = Thing::BEACON()
+        }
     }
     for s in sensors {
         let distance = s.distance()
         let _x = s.sensor.x
-        for y in (s.sensor.y-distance)..(s.sensor.y+distance+1) {
+        if y >= s.sensor.y-distance and y < s.sensor.y+distance {
             let _y = distance - abs(y - s.sensor.y)
             for x in (_x-_y)..(_x+_y+1) {
-                let idx = box.normalise(x, y)
-                if grid[idx] is EMPTY() {
-                    grid[idx] = Thing::UNAVAILABLE()
+                let idx = box.normalise(x, y: box.origin.y)
+                if row[idx] is EMPTY() {
+                    row[idx] = Thing::UNAVAILABLE()
                 }
             }
         }
     }
+}
+
+function print_map(sensors: [Sensor], box: Box) throws {
     for y in 0..box.height() {
+        mut row: [Thing] = [Thing::EMPTY(); box.width()]
+        fill_row(y: (y as! i64) + box.origin.y, row, sensors, box)
         for x in 0..box.width() {
-            print("{:c}", grid[y*box.width()+x].to_byte())
+            print("{:c}", row[x].to_byte())
         }
         println()
     }
@@ -136,5 +140,23 @@ function main(args: [String]) {
     for line in read_lines(filename: "input") {
         sensors.push(Sensor::parse(line))
     }
-    print_map(sensors)
+    mut box: Box = Box(origin: sensors[0].sensor, corner: sensors[0].sensor)
+    for s in sensors {
+        box.adjust_bounds(s.bounds())
+    }
+    mut y = 2000000
+    if box.height() < 2000000 {
+        // example input
+        //print_map(sensors, box)
+        y = 10
+    }
+    mut row: [Thing] = [Thing::EMPTY(); box.width()]
+    fill_row(y, row, sensors, box)
+    mut count = 0uz
+    for x in 0..box.width() {
+        if row[x] is EMPTY() {
+            count ++
+        }
+    }
+    println("Part 1: {}", box.width()-count - 1)
 }
