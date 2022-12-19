@@ -116,7 +116,7 @@ function fill_row(y: i64, mut row: [Thing], sensors: [Sensor], box: Box) {
     for s in sensors {
         let distance = s.distance()
         let _x = s.sensor.x
-        if y >= s.sensor.y-distance and y < s.sensor.y+distance {
+        if y >= s.sensor.y-distance and y <= s.sensor.y+distance {
             let _y = distance - abs(y - s.sensor.y)
             for x in (_x-_y)..(_x+_y+1) {
                 let idx = box.normalise(x, y: box.origin.y)
