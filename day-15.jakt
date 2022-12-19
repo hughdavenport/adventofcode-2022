@@ -5,7 +5,7 @@ struct Point {
     y: i64
 
     function distance(this, anon p: Point) -> i64 {
-        return abs(this.x-p.x)+abs(this.y-p.x)
+        return abs(this.x-p.x)+abs(this.y-p.y)
     }
 }
 
@@ -29,6 +29,16 @@ struct Sensor {
     function distance(this) -> i64 {
         return this.sensor.distance(this.beacon)
     }
+
+    function bounds(this) -> Box {
+        // works out bounds of the diamond surrounding the sensor
+        let distance = this.distance()
+        return Box(
+            origin: Point(x: this.sensor.x - distance, y: this.sensor.y - distance),
+            corner: Point(x: this.sensor.x + distance, y: this.sensor.y + distance)
+        )
+    }
+
 }
 
 struct Box {
@@ -93,13 +103,25 @@ enum Thing {
 function print_map(sensors: [Sensor]) throws {
     mut box: Box = Box(origin: sensors[0].sensor, corner: sensors[0].sensor)
     for s in sensors {
-        box.adjust_bounds(s.sensor)
-        box.adjust_bounds(s.beacon)
+        box.adjust_bounds(s.bounds())
     }
     mut grid: [Thing] = [Thing::EMPTY(); box.size()]
     for s in sensors {
         grid[box.normalise(x: s.sensor.x, y: s.sensor.y)] = Thing::SENSOR()
         grid[box.normalise(x: s.beacon.x, y: s.beacon.y)] = Thing::BEACON()
+    }
+    for s in sensors {
+        let distance = s.distance()
+        let _x = s.sensor.x
+        for y in (s.sensor.y-distance)..(s.sensor.y+distance+1) {
+            let _y = distance - abs(y - s.sensor.y)
+            for x in (_x-_y)..(_x+_y+1) {
+                let idx = box.normalise(x, y)
+                if grid[idx] is EMPTY() {
+                    grid[idx] = Thing::UNAVAILABLE()
+                }
+            }
+        }
     }
     for y in 0..box.height() {
         for x in 0..box.width() {
