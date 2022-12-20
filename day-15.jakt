@@ -119,6 +119,9 @@ function fill_row(y: i64, mut row: [Thing], sensors: [Sensor], box: Box) {
         if y >= s.sensor.y-distance and y <= s.sensor.y+distance {
             let _y = distance - abs(y - s.sensor.y)
             for x in (_x-_y)..(_x+_y+1) {
+                if not box.in_bounds(x, y: box.origin.y) {
+                    continue
+                }
                 let idx = box.normalise(x, y: box.origin.y)
                 if row[idx] is EMPTY() {
                     row[idx] = Thing::UNAVAILABLE()
@@ -130,14 +133,16 @@ function fill_row(y: i64, mut row: [Thing], sensors: [Sensor], box: Box) {
 
 function print_map(sensors: [Sensor], box: Box, bold: Box) throws {
     for y in 0..box.height() {
+        let _y = (y as! i64) + box.origin.y
         mut row: [Thing] = [Thing::EMPTY(); box.width()]
-        fill_row(y: (y as! i64) + box.origin.y, row, sensors, box)
+        fill_row(y: _y, row, sensors, box)
         for x in 0..box.width() {
-            if bold.in_bounds(x: (x as! i64) + box.origin.x, y: (y as! i64) + box.origin.y) {
+            let _x = (x as! i64) + box.origin.x
+            if bold.in_bounds(x: _x, y: _y) {
                 print("\e[1;31m")
             }
             print("{:c}", row[x].to_byte())
-            if bold.in_bounds(x: (x as! i64) + box.origin.x, y: (y as! i64) + box.origin.y) {
+            if bold.in_bounds(x: _x, y: _y) {
                 print("\e[0m")
             }
         }
@@ -172,12 +177,12 @@ function main(args: [String]) {
         }
     }
     println("Part 1: {}", box.width()-count - 1)
-    for y in 0..(search_box.corner.y+1) {
+    for y in search_box.origin.y..(search_box.corner.y+1) {
         mut found = false
-        row = [Thing::EMPTY(); box.width()]
-        fill_row(y, row, sensors, box)
-        for x in 0..(search_box.corner.x+1) {
-            let idx = box.normalise(x, y: box.origin.y)
+        row = [Thing::EMPTY(); search_box.width()]
+        fill_row(y, row, sensors, box: search_box)
+        for x in search_box.origin.x..(search_box.corner.x+1) {
+            let idx = search_box.normalise(x, y: search_box.origin.y)
             if row[idx] is EMPTY() {
                 println("Part 2: {}", x*4000000+y)
                 found = true
