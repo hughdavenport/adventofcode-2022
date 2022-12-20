@@ -177,20 +177,71 @@ function main(args: [String]) {
         }
     }
     println("Part 1: {}", box.width()-count - 1)
-    for y in search_box.origin.y..(search_box.corner.y+1) {
+    for s in sensors {
         mut found = false
-        row = [Thing::EMPTY(); search_box.width()]
-        fill_row(y, row, sensors, box: search_box)
-        for x in search_box.origin.x..(search_box.corner.x+1) {
-            let idx = search_box.normalise(x, y: search_box.origin.y)
-            if row[idx] is EMPTY() {
-                println("Part 2: {}", x*4000000+y)
+        // loop over all edge nodes
+        mut x = s.sensor.x
+        mut y = s.sensor.y - s.distance() - 1
+        while true {
+            found = false
+            let p = Point(x, y)
+            //print_map(sensors, box, bold: Box(origin: p, corner: p))
+            if not search_box.in_bounds(x, y) {
                 found = true
+                let (x_new, y_new, success) = move_next(x, y, s)
+                if not success {
+                    break
+                }
+                x = x_new
+                y = y_new
+                continue
+            }
+            for s2 in sensors {
+                if s2.sensor.distance(p) <= s2.distance() {
+                    found = true
+                    break
+                }
+            }
+            if not found {
                 break
+            }
+            if found {
+                let (x_new, y_new, success) = move_next(x, y, s)
+                if not success {
+                    break
+                }
+                x = x_new
+                y = y_new
             }
         }
         if found {
-            break
+            continue
         }
+        println("Part 2: {}", x*4000000+y)
+        break
     }
+}
+
+function move_next(x: i64, y: i64, s: Sensor) -> (i64, i64, bool) {
+    mut x_ret = x
+    mut y_ret = y
+    if x >= s.sensor.x and y < s.sensor.y {
+        // top right
+        x_ret++
+        y_ret++
+    } else if x > s.sensor.x and y >= s.sensor.y {
+        // bottom right
+        x_ret--
+        y_ret++
+    } else if x <= s.sensor.x and y > s.sensor.y {
+        // bottom left
+        x_ret--
+        y_ret--
+    } else {
+        // top left
+        x_ret++
+        y_ret--
+    }
+    let success = not (x_ret == s.sensor.x and y_ret == s.sensor.y - s.distance() - 1)
+    return (x_ret, y_ret, success)
 }
