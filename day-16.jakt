@@ -1,0 +1,110 @@
+import helpers { read_lines }
+
+class Valve {
+    rate: i64? = None
+    tunnels: [String]
+
+    public function flow_rate(this) -> i64 {
+        return this.rate!
+    }
+
+    public function neighbours(this) -> [String] {
+        return this.tunnels // FIXME this may allow modification
+    }
+
+    public function parse(mut valves: [String: Valve?], anon s: String) throws {
+        let split = s.split(' ')
+        let name = split[1]
+        let rate = split[4].split('=')[1].split(';')[0].to_int()! as! i64
+        // paths start at [9]
+        mut tunnels: [String] = []
+
+        for i in 9..split.size() {
+            let v_name = split[i].split(',')[0]
+            tunnels.push(v_name)
+        }
+
+        mut valve: Valve? = None
+        if valves.contains(name) {
+            valve = valves.get(name)!
+            valve!.rate = rate
+            valve!.tunnels = tunnels
+        } else {
+            valve = Valve(rate, tunnels)
+            valves.set(name, valve)
+        }
+    }
+}
+
+struct Node {
+    current: String? = None
+    minutes: i64 = 0
+    open_valves: [String]
+    released: i64 = 0
+
+    function start_node() throws -> Node {
+        let open_valves: [String] = []
+        return Node(current: "AA", open_valves)
+    }
+
+    function clone(this) throws -> Node {
+        mut open_valves: [String] = []
+        for v in this.open_valves {
+            open_valves.push(v)
+        }
+        return Node(
+            current: this.current,
+            minutes: this.minutes,
+            open_valves,
+            released: this.released
+        )
+    }
+
+    function neighbours(this, valves: [String: Valve?]) throws -> [Node] {
+        mut ret: [Node] = []
+        // open current valve for 1 min
+        if not this.open_valves.contains(this.current!) {
+            mut node = this.clone()
+            node.minutes ++
+            node.open_valves.push(node.current!)
+            ret.push(node)
+        }
+        // move to a new valve for 1 min
+        let valve = valves.get(this.current!)!!
+        for v in valve.neighbours() {
+            mut node = this.clone()
+            node.minutes ++
+            node.current = v
+            ret.push(node)
+        }
+        return ret
+    }
+
+    function is_complete(this) -> bool {
+        return this.minutes_remaining() == 0
+    }
+
+    function minutes_remaining(this) -> i64 {
+        return 30 - this.minutes
+    }
+
+    function f(this) -> i64 {
+        return this.released
+    }
+
+    function h(this, valves: [String: Valve?]) -> i64 {
+        mut ret = 0
+        for v in this.open_valves {
+            ret += this.minutes_remaining() * valves.get(v)!!.flow_rate()
+        }
+        return ret
+    }
+}
+
+function main(args: [String]) {
+    mut valves: [String: Valve?] = Dictionary<String, Valve?>()
+    for line in read_lines(filename: "input") {
+        Valve::parse(valves, line)
+    }
+    let start = Node::start_node()
+}
