@@ -3,7 +3,16 @@ import helpers { read_lines, min }
 class Valve {
     name: String
     rate: i64? = None
-    tunnels: [String: i64]
+    tunnels: [String]
+    tunnel_weights: [String: i64]
+
+    public function set_distance(mut this, anon s: String, anon i: i64) throws {
+        this.tunnel_weights.set(s, i)
+    }
+
+    public function immediate_tunnels(this) -> [String] {
+        return this.tunnels
+    }
 
     public function flow_rate(this) -> i64 {
         return this.rate!
@@ -13,7 +22,7 @@ class Valve {
         // TODO change this to have weights to all other nodes?
         // so we can move all the way to the right place
         // this will be useful in calculating the h()
-        return this.tunnels // FIXME this may allow modification
+        return this.tunnel_weights // FIXME this may allow modification
     }
 
     public function parse(mut valves: [String: Valve?], anon s: String) throws -> Valve {
@@ -21,59 +30,32 @@ class Valve {
         let name = split[1]
         let rate = split[4].split('=')[1].split(';')[0].to_int()! as! i64
         // paths start at [9]
-        mut tunnels: [String: i64] = Dictionary<String, i64>()
+        mut tunnels: [String] = []
 
         for i in 9..split.size() {
             let v_name = split[i].split(',')[0]
-            tunnels.set(v_name, 1)
-        }
-        for v_name in tunnels.keys() {
-            if valves.contains(v_name) {
-                // we've already seen this valve defined earlier in the input
-                mut v = valves.get(v_name)!!
-                // any valve that we can see, we can see their neighbours + 1
-                for (s, i) in v.tunnels {
-                    if s == name { continue }
-                    // fixme, the +1 should really check that what is in tunnels (it should just be 1 from input?)
-                    if tunnels.contains(s) {
-                        // fixme just do nothing? if we already have it it is likely from input text? (so =min(1, i+1) =1)
-                        tunnels.set(s, min(tunnels[s], i + 1))
-                    } else {
-                        tunnels.set(s, i + 1)
-                    }
-                }
-                // if that valve can see us (I think it's reflexible, but best to check)
-                // then we should get them to add a path to all our neighbours adding the distance
-                // that should recurse to their neighbours
-                if v.tunnels.contains(name) {
-                    for (s, i) in tunnels {
-                        if s == v_name { continue }
-                        let d = v.tunnels.get(name)!
-                        v.add_path(valves, s, i + d)
-                    }
-                }
-            }
+            tunnels.push(v_name)
         }
 
-        tunnels.set(name, 0)
-        let valve = Some(Valve(name, rate, tunnels))
+        let tunnel_weights: [String: i64] = Dictionary<String, i64>()
+        let valve = Some(Valve(name, rate, tunnels, tunnel_weights))
         valves.set(name, valve)
         return valve!
     }
 
-    function add_path(mut this, mut valves: [String: Valve?], anon s: String, anon i: i64) throws {
-        if this.tunnels.contains(s) and this.tunnels[s] < i {
+    function remove_me_add_path(mut this, mut valves: [String: Valve?], anon s: String, anon i: i64) throws {
+        if this.tunnel_weights.contains(s) and this.tunnel_weights[s] < i {
             return
         }
-        this.tunnels.set(s, i)
-        for v_name in this.tunnels.keys() {
+        this.tunnel_weights.set(s, i)
+        for v_name in this.tunnel_weights.keys() {
             if v_name == s { continue }
             if valves.contains(v_name) {
                 mut v = valves.get(v_name)!!
-                if v.tunnels.contains(this.name) {
-                    let d = v.tunnels.get(this.name)!
+                if v.tunnel_weights.contains(this.name) {
+                    let d = v.tunnel_weights.get(this.name)!
                     if d == 0 { continue }
-                    v.add_path(valves, s, i + d)
+                    v.remove_me_add_path(valves, s, i + d)
                 }
             }
         }
@@ -204,7 +186,7 @@ function get_highest(open: Dictionary<String, Node>, fs: Dictionary<String, i64?
     return max_s!
 }
 
-function get_lowest(open: Dictionary<String, Node>, fs: Dictionary<String, i64?>) -> String {
+function get_lowest(anon open: Dictionary<String, Node>, anon fs: Dictionary<String, i64?>) -> String {
     // FIXME: Implement a min-heap or priority queue to reduce this
     // to O(log(n)). Currently it is O(n), n being around ?? for input
     // this is also run many times in the a_star function
@@ -218,7 +200,20 @@ function get_lowest(open: Dictionary<String, Node>, fs: Dictionary<String, i64?>
     }
     return min_s!
 }
-
+function get_lowest2(anon open: Dictionary<String, Valve?>, anon fs: Dictionary<String, i64?>) -> String {
+    // FIXME: Implement a min-heap or priority queue to reduce this
+    // to O(log(n)). Currently it is O(n), n being around ?? for input
+    // this is also run many times in the a_star function
+    mut min_s: String? = None
+    mut min: i64? = None
+    for (s, n) in open {
+        if fs.contains(s) and (not min.has_value() or fs[s]! < min!) {
+            min = fs[s]!
+            min_s = s
+        }
+    }
+    return min_s!
+}
 function a_star(valves: [String: Valve?], start: Node) throws -> Node? {
     let start_str = format("{}", start)
     mut open: Dictionary<String, Node> = [start_str: start]
@@ -229,6 +224,8 @@ function a_star(valves: [String: Valve?], start: Node) throws -> Node? {
     while not open.is_empty() {
         let current_s = get_lowest(open, fs)
         let current = open.get(current_s)!
+        println("open.size() = {}", open.size())
+        println("current = {}", current)
         if current.is_complete() {
             return current
         }
@@ -248,11 +245,47 @@ function a_star(valves: [String: Valve?], start: Node) throws -> Node? {
     return None
 }
 
+function dijkstra(mut valves: [String: Valve?]) throws {
+    for (source_s, source_v) in valves {
+        mut source = source_v
+        mut q = Dictionary<String, Valve?>()
+        mut dist = Dictionary<String, i64?>()
+        for (v_s, v) in valves {
+            q.set(v_s, v)
+        }
+        dist[source_s] = 0
+        source!.set_distance(source_s, 0)
+
+        while not q.is_empty() {
+            let u_s = get_lowest2(q, dist)
+            let u = q[u_s]!
+            q.remove(u_s)
+            for v_s in u.immediate_tunnels() {
+                if not q.contains(v_s) { continue }
+                let v = q[v_s]!
+                let alt = dist[u_s]! + 1 // edge weight always 1 here
+                if not dist.contains(v_s) or alt < dist[v_s]! {
+                    dist[v_s] = alt
+                    source!.set_distance(v_s, alt)
+                }
+            }
+        }
+    }
+}
+
 function main(args: [String]) {
     mut valves: [String: Valve?] = Dictionary<String, Valve?>()
     for line in read_lines(filename: "input") {
         let v = Valve::parse(valves, line)
     }
+    dijkstra(valves)
+//    for (s, v) in valves {
+//        println("{}", s)
+//        for (n, d) in v!.neighbours() {
+//            println("  {} - {}", n, d)
+//        }
+//    }
+    //if 1 == 1 { return 0 }
     let start = Node::start_node()
     mut max_node = a_star(valves, start)!
     println("Part 1: {}", max_node.released)
