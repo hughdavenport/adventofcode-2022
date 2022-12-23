@@ -1,37 +1,81 @@
-import helpers { read_lines }
+import helpers { read_lines, min }
 
 class Valve {
+    name: String
     rate: i64? = None
-    tunnels: [String]
+    tunnels: [String: i64]
 
     public function flow_rate(this) -> i64 {
         return this.rate!
     }
 
-    public function neighbours(this) -> [String] {
+    public function neighbours(this) -> [String: i64] {
+        // TODO change this to have weights to all other nodes?
+        // so we can move all the way to the right place
+        // this will be useful in calculating the h()
         return this.tunnels // FIXME this may allow modification
     }
 
-    public function parse(mut valves: [String: Valve?], anon s: String) throws {
+    public function parse(mut valves: [String: Valve?], anon s: String) throws -> Valve {
         let split = s.split(' ')
         let name = split[1]
         let rate = split[4].split('=')[1].split(';')[0].to_int()! as! i64
         // paths start at [9]
-        mut tunnels: [String] = []
+        mut tunnels: [String: i64] = Dictionary<String, i64>()
 
         for i in 9..split.size() {
             let v_name = split[i].split(',')[0]
-            tunnels.push(v_name)
+            tunnels.set(v_name, 1)
+        }
+        for v_name in tunnels.keys() {
+            if valves.contains(v_name) {
+                // we've already seen this valve defined earlier in the input
+                mut v = valves.get(v_name)!!
+                // any valve that we can see, we can see their neighbours + 1
+                for (s, i) in v.tunnels {
+                    if s == name { continue }
+                    // fixme, the +1 should really check that what is in tunnels (it should just be 1 from input?)
+                    if tunnels.contains(s) {
+                        // fixme just do nothing? if we already have it it is likely from input text? (so =min(1, i+1) =1)
+                        tunnels.set(s, min(tunnels[s], i + 1))
+                    } else {
+                        tunnels.set(s, i + 1)
+                    }
+                }
+                // if that valve can see us (I think it's reflexible, but best to check)
+                // then we should get them to add a path to all our neighbours adding the distance
+                // that should recurse to their neighbours
+                if v.tunnels.contains(name) {
+                    for (s, i) in tunnels {
+                        if s == v_name { continue }
+                        let d = v.tunnels.get(name)!
+                        v.add_path(valves, s, i + d)
+                    }
+                }
+            }
         }
 
-        mut valve: Valve? = None
-        if valves.contains(name) {
-            valve = valves.get(name)!
-            valve!.rate = rate
-            valve!.tunnels = tunnels
-        } else {
-            valve = Valve(rate, tunnels)
-            valves.set(name, valve)
+        tunnels.set(name, 0)
+        let valve = Some(Valve(name, rate, tunnels))
+        valves.set(name, valve)
+        return valve!
+    }
+
+    function add_path(mut this, mut valves: [String: Valve?], anon s: String, anon i: i64) throws {
+        if this.tunnels.contains(s) and this.tunnels[s] < i {
+            return
+        }
+        this.tunnels.set(s, i)
+        for v_name in this.tunnels.keys() {
+            if v_name == s { continue }
+            if valves.contains(v_name) {
+                mut v = valves.get(v_name)!!
+                if v.tunnels.contains(this.name) {
+                    let d = v.tunnels.get(this.name)!
+                    if d == 0 { continue }
+                    v.add_path(valves, s, i + d)
+                }
+            }
         }
     }
 }
@@ -41,6 +85,7 @@ struct Node {
     minutes: i64 = 0
     open_valves: [String]
     released: i64 = 0
+    just_opened: String? = None
 
     function start_node() throws -> Node {
         let open_valves: [String] = []
@@ -62,19 +107,37 @@ struct Node {
 
     function neighbours(this, valves: [String: Valve?]) throws -> [Node] {
         mut ret: [Node] = []
-        // open current valve for 1 min
-        if not this.open_valves.contains(this.current!) {
+        // move to a new valve for x min, then open it, ignore 0 rates and already open
+        let valve = valves.get(this.current!)!!
+        for (s, i) in valve.neighbours() {
+            if s == this.current! { continue }
+            if this.open_valves.contains(s) { continue }
+            if valves.get(s)!!.flow_rate() == 0 { continue }
             mut node = this.clone()
-            node.minutes ++
+            mut time = i
+            if time > this.minutes_remaining() {
+                time = this.minutes_remaining()
+            }
+            // move there, then open it
+            time ++
+            node.minutes += time
+            node.current = s
+            for v2 in node.open_valves {
+                node.released += time * valves.get(v2)!!.flow_rate()
+            }
+            // open it
             node.open_valves.push(node.current!)
+            node.just_opened = node.current!
             ret.push(node)
         }
-        // move to a new valve for 1 min
-        let valve = valves.get(this.current!)!!
-        for v in valve.neighbours() {
+        // if we don't have neighbours, just stay put and wait
+        if ret.size() == 0 {
             mut node = this.clone()
-            node.minutes ++
-            node.current = v
+            let time = this.minutes_remaining()
+            node.minutes += time
+            for v2 in node.open_valves {
+                node.released += time * valves.get(v2)!!.flow_rate()
+            }
             ret.push(node)
         }
         return ret
@@ -88,23 +151,109 @@ struct Node {
         return 30 - this.minutes
     }
 
-    function f(this) -> i64 {
-        return this.released
+    function g(this, valves: [String: Valve?]) -> i64 {
+        return this.max_possible_g(valves) - this.released
+    }
+
+    function max_possible_g(this, valves: [String: Valve?]) -> i64 {
+        mut ret = 0
+        for (s, v) in valves {
+            ret += this.minutes * v!.flow_rate()
+        }
+        return ret
     }
 
     function h(this, valves: [String: Valve?]) -> i64 {
-        mut ret = 0
+        mut ret = -this.max_possible_h(valves)
         for v in this.open_valves {
-            ret += this.minutes_remaining() * valves.get(v)!!.flow_rate()
+            mut time = this.minutes_remaining()
+            if this.just_opened.has_value() and this.just_opened! == v {
+                time --
+            }
+            ret -= time * valves.get(v)!!.flow_rate()
+        }
+        return ret
+    }
+
+    function max_possible_h(this, valves: [String: Valve?]) -> i64 {
+        if this.minutes_remaining() == 0 { return 0 }
+        mut ret = 0
+        let current = valves.get(this.current!)!!
+        for (s, v) in valves {
+            // this assumes that we will always travel from this node, but in reality we will go to one, then to another from there
+            let distance = current.neighbours().get(s)!
+            let time = this.minutes_remaining() - 1// - distance
+            ret += time * v!.flow_rate()
         }
         return ret
     }
 }
 
+function get_highest(open: Dictionary<String, Node>, fs: Dictionary<String, i64?>) -> String {
+    // FIXME: Implement a min-heap or priority queue to reduce this
+    // to O(log(n)). Currently it is O(n), n being around ?? for input
+    // this is also run many times in the a_star function
+    mut max_s: String? = None
+    mut max: i64? = None
+    for (s, n) in open {
+        if not max.has_value() or fs[s]! > max! {
+            max = fs[s]!
+            max_s = s
+        }
+    }
+    return max_s!
+}
+
+function get_lowest(open: Dictionary<String, Node>, fs: Dictionary<String, i64?>) -> String {
+    // FIXME: Implement a min-heap or priority queue to reduce this
+    // to O(log(n)). Currently it is O(n), n being around ?? for input
+    // this is also run many times in the a_star function
+    mut min_s: String? = None
+    mut min: i64? = None
+    for (s, n) in open {
+        if not min.has_value() or fs[s]! < min! {
+            min = fs[s]!
+            min_s = s
+        }
+    }
+    return min_s!
+}
+
+function a_star(valves: [String: Valve?], start: Node) throws -> Node? {
+    let start_str = format("{}", start)
+    mut open: Dictionary<String, Node> = [start_str: start]
+    mut gs = Dictionary<String, i64?>()
+    gs[start_str] = start.g(valves)
+    mut fs = Dictionary<String, i64?>()
+    fs[start_str] = start.h(valves)
+    while not open.is_empty() {
+        let current_s = get_lowest(open, fs)
+        let current = open.get(current_s)!
+        if current.is_complete() {
+            return current
+        }
+        open.remove(current_s)
+        for n in current.neighbours(valves) {
+            let n_s = format("{}", n)
+            let g = n.g(valves)
+            if not gs.contains(n_s) or g < gs[n_s]! {
+                gs[n_s] = g
+                fs[n_s] = g + n.h(valves)
+                if not open.contains(n_s) {
+                    open.set(n_s, n)
+                }
+            }
+        }
+    }
+    return None
+}
+
 function main(args: [String]) {
     mut valves: [String: Valve?] = Dictionary<String, Valve?>()
     for line in read_lines(filename: "input") {
-        Valve::parse(valves, line)
+        let v = Valve::parse(valves, line)
     }
     let start = Node::start_node()
+    mut max_node = a_star(valves, start)!
+    println("Part 1: {}", max_node.released)
 }
