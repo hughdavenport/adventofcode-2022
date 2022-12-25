@@ -42,24 +42,6 @@ class Valve {
         valves.set(name, valve)
         return valve!
     }
-
-    function remove_me_add_path(mut this, mut valves: [String: Valve?], anon s: String, anon i: i64) throws {
-        if this.tunnel_weights.contains(s) and this.tunnel_weights[s] < i {
-            return
-        }
-        this.tunnel_weights.set(s, i)
-        for v_name in this.tunnel_weights.keys() {
-            if v_name == s { continue }
-            if valves.contains(v_name) {
-                mut v = valves.get(v_name)!!
-                if v.tunnel_weights.contains(this.name) {
-                    let d = v.tunnel_weights.get(this.name)!
-                    if d == 0 { continue }
-                    v.remove_me_add_path(valves, s, i + d)
-                }
-            }
-        }
-    }
 }
 
 struct Node {
@@ -96,12 +78,12 @@ struct Node {
             if this.open_valves.contains(s) { continue }
             if valves.get(s)!!.flow_rate() == 0 { continue }
             mut node = this.clone()
-            mut time = i
+            mut time = i + 1 // travel time + open time
             if time > this.minutes_remaining() {
-                time = this.minutes_remaining()
+                // takes too long
+                continue
             }
             // move there, then open it
-            time ++
             node.minutes += time
             node.current = s
             for v2 in node.open_valves {
@@ -146,6 +128,9 @@ struct Node {
     }
 
     function h(this, valves: [String: Valve?]) -> i64 {
+        return 0
+    }
+    function _h(this, valves: [String: Valve?]) -> i64 {
         mut ret = -this.max_possible_h(valves)
         for v in this.open_valves {
             mut time = this.minutes_remaining()
@@ -164,7 +149,7 @@ struct Node {
         for (s, v) in valves {
             // this assumes that we will always travel from this node, but in reality we will go to one, then to another from there
             let distance = current.neighbours().get(s)!
-            let time = this.minutes_remaining() - 1// - distance
+            let time = this.minutes_remaining()// - 1 - distance
             ret += time * v!.flow_rate()
         }
         return ret
