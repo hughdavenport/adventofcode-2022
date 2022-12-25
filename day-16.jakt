@@ -46,10 +46,12 @@ class Valve {
 
 struct Node {
     current: String? = None
+    current_e: String? = None
     minutes: i64 = 0
     open_valves: [String]
     released: i64 = 0
     just_opened: String? = None
+    just_opened_e: String? = None
 
     function start_node() throws -> Node {
         let open_valves: [String] = []
@@ -69,30 +71,82 @@ struct Node {
         )
     }
 
-    function neighbours(this, valves: [String: Valve?]) throws -> [Node] {
+    function neighbours(this, valves: [String: Valve?], elephant: bool=false) throws -> [Node] {
         mut ret: [Node] = []
+        if elephant and this.minutes == 0 {
+            mut node = this.clone()
+            // teach the elephant how to do things
+            node.minutes += 4
+            ret.push(node)
+            return ret
+        }
         // move to a new valve for x min, then open it, ignore 0 rates and already open
         let valve = valves.get(this.current!)!!
         for (s, i) in valve.neighbours() {
             if s == this.current! { continue }
             if this.open_valves.contains(s) { continue }
             if valves.get(s)!!.flow_rate() == 0 { continue }
-            mut node = this.clone()
             mut time = i + 1 // travel time + open time
             if time > this.minutes_remaining() {
                 // takes too long
                 continue
             }
-            // move there, then open it
-            node.minutes += time
-            node.current = s
-            for v2 in node.open_valves {
-                node.released += time * valves.get(v2)!!.flow_rate()
+            if elephant {
+                for (s_e, i_e) in valve.neighbours() {
+                    if s == s_e { continue }
+                    if s_e == this.current! { continue }
+                    if this.open_valves.contains(s_e) { continue }
+                    if valves.get(s_e)!!.flow_rate() == 0 { continue }
+                    mut node = this.clone()
+                    mut time_e = i_e + 1 // travel time + open time
+                    if time_e > this.minutes_remaining() {
+                        // takes too long
+                        continue
+                    }
+                    // move there, then open it
+
+                    // TODO
+                    // work out max of time and time_e
+                    //  add that to minutes
+                    //  add difference to minutes_ahead
+                    //  minutes_ahead will have to get taken into account for new neighbours (take off time and time_e?)
+
+                    // or, keep track of which node we are heading to, and have minutes_to_go or something
+                    // then we can go to min of time and time_e
+                    // then next one we don't pick a new neighbour for that node, and instead pick the same one with minutes_to_go
+
+
+                    node.minutes += time
+                    node.current = s
+                    node.current_e = s_e
+                    for v2 in node.open_valves {
+                        node.released += time * valves.get(v2)!!.flow_rate()
+                    }
+                    // open it
+                    node.open_valves.push(node.current!)
+                    node.open_valves.push(node.current_e!)
+                    node.just_opened = node.current!
+                    node.just_opened_e = node.current_e!
+                    ret.push(node)
+                }
+            } else {
+                mut node = this.clone()
+                mut time = i + 1 // travel time + open time
+                if time > this.minutes_remaining() {
+                    // takes too long
+                    continue
+                }
+                // move there, then open it
+                node.minutes += time
+                node.current = s
+                for v2 in node.open_valves {
+                    node.released += time * valves.get(v2)!!.flow_rate()
+                }
+                // open it
+                node.open_valves.push(node.current!)
+                node.just_opened = node.current!
+                ret.push(node)
             }
-            // open it
-            node.open_valves.push(node.current!)
-            node.just_opened = node.current!
-            ret.push(node)
         }
         // if we don't have neighbours, just stay put and wait
         if ret.size() == 0 {
@@ -199,7 +253,7 @@ function get_lowest2(anon open: Dictionary<String, Valve?>, anon fs: Dictionary<
     }
     return min_s!
 }
-function a_star(valves: [String: Valve?], start: Node) throws -> Node? {
+function a_star(valves: [String: Valve?], start: Node, elephant: bool = false) throws -> Node? {
     let start_str = format("{}", start)
     mut open: Dictionary<String, Node> = [start_str: start]
     mut gs = Dictionary<String, i64?>()
@@ -215,7 +269,7 @@ function a_star(valves: [String: Valve?], start: Node) throws -> Node? {
             return current
         }
         open.remove(current_s)
-        for n in current.neighbours(valves) {
+        for n in current.neighbours(valves, elephant) {
             let n_s = format("{}", n)
             let g = n.g(valves)
             if not gs.contains(n_s) or g < gs[n_s]! {
@@ -274,4 +328,6 @@ function main(args: [String]) {
     let start = Node::start_node()
     mut max_node = a_star(valves, start)!
     println("Part 1: {}", max_node.released)
+    max_node = a_star(valves, start, elephant: true)!
+    println("Part 2: {}", max_node.released)
 }
