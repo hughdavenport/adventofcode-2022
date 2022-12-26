@@ -52,10 +52,12 @@ struct Node {
     released: i64 = 0
     just_opened: String? = None
     just_opened_e: String? = None
+    minutes_left: i64 = 0
+    minutes_left_e: i64 = 0
 
     function start_node() throws -> Node {
         let open_valves: [String] = []
-        return Node(current: "AA", open_valves)
+        return Node(current: "AA", current_e: "AA", open_valves)
     }
 
     function clone(this) throws -> Node {
@@ -65,9 +67,10 @@ struct Node {
         }
         return Node(
             current: this.current,
+            current_e: this.current_e,
             minutes: this.minutes,
             open_valves,
-            released: this.released
+            released: this.released,
         )
     }
 
@@ -80,62 +83,223 @@ struct Node {
             ret.push(node)
             return ret
         }
-        // move to a new valve for x min, then open it, ignore 0 rates and already open
-        let valve = valves.get(this.current!)!!
-        for (s, i) in valve.neighbours() {
-            if s == this.current! { continue }
-            if this.open_valves.contains(s) { continue }
-            if valves.get(s)!!.flow_rate() == 0 { continue }
-            mut time = i + 1 // travel time + open time
-            if time > this.minutes_remaining() {
-                // takes too long
-                continue
-            }
-            if elephant {
-                for (s_e, i_e) in valve.neighbours() {
+        if elephant {
+            // FIXME:
+            // we currently have mirrored node paths
+            // it doesn't matter if we do one valve and the elephant the other or vice versa
+            if this.minutes_left > 0 {
+                // pick another one for the elephant, get min and set either minutes_left or minutes_left_e
+                let s = this.current!
+                mut time = this.minutes_left
+                let valve_e = valves.get(this.current_e!)!!
+                for (s_e, i_e) in valve_e.neighbours() {
                     if s == s_e { continue }
-                    if s_e == this.current! { continue }
+                    if s_e == this.current_e! { continue }
                     if this.open_valves.contains(s_e) { continue }
                     if valves.get(s_e)!!.flow_rate() == 0 { continue }
-                    mut node = this.clone()
+                    time = this.minutes_left
                     mut time_e = i_e + 1 // travel time + open time
-                    if time_e > this.minutes_remaining() {
-                        // takes too long
-                        continue
-                    }
-                    // move there, then open it
-
-                    // TODO
-                    // work out max of time and time_e
-                    //  add that to minutes
-                    //  add difference to minutes_ahead
-                    //  minutes_ahead will have to get taken into account for new neighbours (take off time and time_e?)
-
-                    // or, keep track of which node we are heading to, and have minutes_to_go or something
-                    // then we can go to min of time and time_e
-                    // then next one we don't pick a new neighbour for that node, and instead pick the same one with minutes_to_go
-
-
-                    node.minutes += time
-                    node.current = s
+                    mut node = this.clone()
                     node.current_e = s_e
+                    if time_e > time {
+                        // we can get all the way to our valve, the elephant won't
+                        time_e -= time
+                        node.minutes += time
+                        node.minutes_left = 0
+                        node.minutes_left_e = time_e // set time remaining for elephant
+                        for v2 in node.open_valves {
+                            node.released += time * valves.get(v2)!!.flow_rate()
+                        }
+                        // open it
+                        node.open_valves.push(node.current!)
+                        node.just_opened = node.current!
+                        ret.push(node)
+                    } else {
+                        // we either get to our goal at same time as elephant, or elephant beats us
+                        time -= time_e
+                        node.minutes += time_e
+                        node.minutes_left = time // this may be 0 if we get there at same time
+                        node.minutes_left_e = 0
+                        for v2 in node.open_valves {
+                            node.released += time_e * valves.get(v2)!!.flow_rate()
+                        }
+                        // open it
+                        if time == 0 {
+                            node.open_valves.push(node.current!)
+                            node.just_opened = node.current!
+                        }
+                        node.open_valves.push(node.current_e!)
+                        node.just_opened_e = node.current_e!
+                        ret.push(node)
+                    }
+                }
+                if ret.size() == 0 {
+                    mut node = this.clone()
+                    time = this.minutes_left
+                    if time > this.minutes_remaining() {
+                        // should be unreachable with check above
+                        eprintln("unreachable time > this.minutes_remaining() ({} > {}) - {}", time, this.minutes_remaining(), this)
+                        return ret
+                    }
+                    node.minutes += time
+                    node.minutes_left = 0
                     for v2 in node.open_valves {
                         node.released += time * valves.get(v2)!!.flow_rate()
                     }
-                    // open it
                     node.open_valves.push(node.current!)
-                    node.open_valves.push(node.current_e!)
                     node.just_opened = node.current!
+                    ret.push(node)
+                }
+            } else if this.minutes_left_e > 0 {
+                // pick another one for us, elephant is still on route
+                let s_e = this.current_e!
+                mut time_e = this.minutes_left_e
+                let valve = valves.get(this.current!)!!
+                for (s, i) in valve.neighbours() {
+                    if s == s_e { continue }
+                    if s == this.current! { continue }
+                    if this.open_valves.contains(s) { continue }
+                    if valves.get(s)!!.flow_rate() == 0 { continue }
+                    time_e = this.minutes_left_e
+                    mut time = i + 1 // travel time + open time
+                    mut node = this.clone()
+                    node.current = s
+                    if time_e > time {
+                        // we can get all the way to our valve, the elephant won't
+                        time_e -= time
+                        node.minutes += time
+                        node.minutes_left = 0
+                        node.minutes_left_e = time_e // set time remaining for elephant
+                        for v2 in node.open_valves {
+                            node.released += time * valves.get(v2)!!.flow_rate()
+                        }
+                        // open it
+                        node.open_valves.push(node.current!)
+                        node.just_opened = node.current!
+                        ret.push(node)
+                    } else {
+                        // we either get to our goal at same time as elephant, or elephant beats us
+                        time -= time_e
+                        node.minutes += time_e
+                        node.minutes_left = time // this may be 0 if we get there at same time
+                        node.minutes_left_e = 0
+                        for v2 in node.open_valves {
+                            node.released += time_e * valves.get(v2)!!.flow_rate()
+                        }
+                        // open it
+                        if time == 0 {
+                            node.open_valves.push(node.current!)
+                            node.just_opened = node.current!
+                        }
+                        node.open_valves.push(node.current_e!)
+                        node.just_opened_e = node.current_e!
+                        ret.push(node)
+                    }
+                }
+                if ret.size() == 0 {
+                    mut node = this.clone()
+                    time_e = this.minutes_left_e
+                    if time_e > this.minutes_remaining() {
+                        // should be unreachable with check above
+                        eprintln("unreachable time_e > this.minutes_remaining() ({} > {}) - {}", time_e, this.minutes_remaining(), this)
+                        return ret
+                    }
+                    node.minutes += time_e
+                    node.minutes_left_e = 0
+                    for v2 in node.open_valves {
+                        node.released += time_e * valves.get(v2)!!.flow_rate()
+                    }
+                    node.open_valves.push(node.current_e!)
                     node.just_opened_e = node.current_e!
                     ret.push(node)
                 }
             } else {
-                mut node = this.clone()
+                // both us and the elephant need to start moving
+                // will need to find the min
+                let valve = valves.get(this.current!)!!
+                mut possibles: [String] = []
+                for (s, i) in valve.neighbours() {
+                    if s == this.current! { continue }
+                    if this.open_valves.contains(s) { continue }
+                    if valves.get(s)!!.flow_rate() == 0 { continue }
+                    let time = i + 1 // travel time + open time
+                    if time > this.minutes_remaining() {
+                        // takes too long
+                        continue
+                    }
+                    possibles.push(s)
+                }
+                for (s, i) in valve.neighbours() {
+                    if s == this.current! { continue }
+                    if this.open_valves.contains(s) { continue }
+                    if valves.get(s)!!.flow_rate() == 0 { continue }
+                    mut time = i + 1 // travel time + open time
+                    if time > this.minutes_remaining() {
+                        // takes too long
+                        continue
+                    }
+                    let valve_e = valves.get(this.current_e!)!!
+                    for (s_e, i_e) in valve_e.neighbours() {
+                        if possibles.size() > 1 and s == s_e { continue }
+                        if s_e == this.current_e! { continue }
+                        if this.open_valves.contains(s_e) { continue }
+                        if valves.get(s_e)!!.flow_rate() == 0 { continue }
+                        time = i + 1 // travel time + open time
+                        mut time_e = i_e + 1 // travel time + open time
+                        if time_e > this.minutes_remaining() {
+                            // takes too long
+                            continue
+                        }
+                        mut node = this.clone()
+                        node.current = s
+                        node.current_e = s_e
+                        if time_e > time {
+                            // we can get all the way to our valve, the elephant won't
+                            time_e -= time
+                            node.minutes += time
+                            node.minutes_left = 0
+                            node.minutes_left_e = time_e // set time remaining for elephant
+                            for v2 in node.open_valves {
+                                node.released += time * valves.get(v2)!!.flow_rate()
+                            }
+                            // open it
+                            node.open_valves.push(node.current!)
+                            node.just_opened = node.current!
+                            ret.push(node)
+                        } else {
+                            // we either get to our goal at same time as elephant, or elephant beats us
+                            time -= time_e
+                            node.minutes += time_e
+                            node.minutes_left = time // this may be 0 if we get there at same time
+                            node.minutes_left_e = 0
+                            for v2 in node.open_valves {
+                                node.released += time_e * valves.get(v2)!!.flow_rate()
+                            }
+                            // open it
+                            if time == 0 and s != s_e {
+                                node.open_valves.push(node.current!)
+                                node.just_opened = node.current!
+                            }
+                            node.open_valves.push(node.current_e!)
+                            node.just_opened_e = node.current_e!
+                            ret.push(node)
+                        }
+                    }
+                }
+            }
+        } else {
+            // move to a new valve for x min, then open it, ignore 0 rates and already open
+            let valve = valves.get(this.current!)!!
+            for (s, i) in valve.neighbours() {
+                if s == this.current! { continue }
+                if this.open_valves.contains(s) { continue }
+                if valves.get(s)!!.flow_rate() == 0 { continue }
                 mut time = i + 1 // travel time + open time
                 if time > this.minutes_remaining() {
                     // takes too long
                     continue
                 }
+                mut node = this.clone()
                 // move there, then open it
                 node.minutes += time
                 node.current = s
@@ -263,8 +427,6 @@ function a_star(valves: [String: Valve?], start: Node, elephant: bool = false) t
     while not open.is_empty() {
         let current_s = get_lowest(open, fs)
         let current = open.get(current_s)!
-        println("open.size() = {}", open.size())
-        println("current = {}", current)
         if current.is_complete() {
             return current
         }
