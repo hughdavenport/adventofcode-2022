@@ -84,9 +84,6 @@ struct Node {
             return ret
         }
         if elephant {
-            // FIXME:
-            // we currently have mirrored node paths
-            // it doesn't matter if we do one valve and the elephant the other or vice versa
             if this.minutes_left > 0 {
                 // pick another one for the elephant, get min and set either minutes_left or minutes_left_e
                 let s = this.current!
@@ -229,7 +226,11 @@ struct Node {
                     }
                     possibles.push(s)
                 }
-                for (s, i) in valve.neighbours() {
+                let n = valve.neighbours()
+                let keys = n.keys()
+                for idx in 0..keys.size() {
+                    let s = keys[idx]
+                    let i = n[s]
                     if s == this.current! { continue }
                     if this.open_valves.contains(s) { continue }
                     if valves.get(s)!!.flow_rate() == 0 { continue }
@@ -239,7 +240,18 @@ struct Node {
                         continue
                     }
                     let valve_e = valves.get(this.current_e!)!!
-                    for (s_e, i_e) in valve_e.neighbours() {
+                    let n_e = valve_e.neighbours()
+                    let keys_e = n_e.keys()
+                    mut start = 0uz
+                    if this.current_e! == this.current! {
+                        // prob only happens when both AA
+                        // when this happens we don't want to have nodes before ours
+                        // otherwise we'll have reflected ones
+                        start = idx + 1
+                    }
+                    for idx_e in start..keys_e.size() {
+                        let s_e = keys_e[idx_e]
+                        let i_e = n_e[s_e]
                         if possibles.size() > 1 and s == s_e { continue }
                         if s_e == this.current_e! { continue }
                         if this.open_valves.contains(s_e) { continue }
