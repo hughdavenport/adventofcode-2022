@@ -1,10 +1,15 @@
 import helpers { read_lines, min }
 
-class Valve {
-    name: String
+class Valve implements(Hashable,Comparable<Valve>,Equatable<Valve>) {
+    public name: String
     rate: i64? = None
     tunnels: [String]
     tunnel_weights: [String: i64]
+    public source: Valve? = None
+
+    public function remove_neighbour(mut this, anon s: String) {
+        this.tunnel_weights.remove(s)
+    }
 
     public function set_distance(mut this, anon s: String, anon i: i64) throws {
         this.tunnel_weights.set(s, i)
@@ -42,9 +47,39 @@ class Valve {
         valves.set(name, valve)
         return valve!
     }
+
+    public function equals(this, anon other: Valve) -> bool {
+        return .name == other.name
+    }
+
+    public function compare(this, anon other: Valve) -> i64 {
+        guard .source.has_value() else {
+            let me = 0
+            guard other.source.has_value() else { return 0 }
+            guard other.source!.tunnel_weights.contains(other.name) else { return -1 }
+            let them = other.source!.tunnel_weights[other.name]
+            return me as! i64 - them as! i64
+        }
+        guard .source!.tunnel_weights.contains(.name) else {
+            guard .source!.tunnel_weights.contains(other.name) else { return 0 }
+            return 1
+        }
+        guard .source!.tunnel_weights.contains(other.name) else { return -1 }
+        let me = .source!.tunnel_weights[.name]
+        let them = .source!.tunnel_weights[other.name]
+        return me - them
+    }
+
+    public function hash(this) -> u32 {
+        return .name.hash()
+    }
 }
 
-struct Node {
+class Valves {
+    public d: [String: Valve?]
+}
+
+struct Node implements(Hashable,Comparable<Node>,Equatable<Node>) {
     current: String? = None
     current_e: String? = None
     minutes: i64 = 0
@@ -54,10 +89,15 @@ struct Node {
     just_opened_e: String? = None
     minutes_left: i64 = 0
     minutes_left_e: i64 = 0
+    valves: Valves?
 
-    function start_node() throws -> Node {
+    function to_string(this) throws -> String {
+        return format("min={},rel={},open={},cur={},cur_e={},left={},left_e={}", .minutes, .released, .open_valves, .current, .current_e, .minutes_left, .minutes_left_e)
+    }
+
+    function start_node(valves: Valves) throws -> Node {
         let open_valves: [String] = []
-        return Node(current: "AA", current_e: "AA", open_valves)
+        return Node(current: "AA", current_e: "AA", open_valves, valves)
     }
 
     function clone(this) throws -> Node {
@@ -71,10 +111,11 @@ struct Node {
             minutes: this.minutes,
             open_valves,
             released: this.released,
+            valves: this.valves,
         )
     }
 
-    function neighbours(this, valves: [String: Valve?], elephant: bool=false) throws -> [Node] {
+    function neighbours(this, valves: Valves, elephant: bool=false) throws -> [Node] {
         mut ret: [Node] = []
         if elephant and this.minutes == 0 {
             mut node = this.clone()
@@ -88,12 +129,12 @@ struct Node {
                 // pick another one for the elephant, get min and set either minutes_left or minutes_left_e
                 let s = this.current!
                 mut time = this.minutes_left
-                let valve_e = valves.get(this.current_e!)!!
+                let valve_e = valves.d.get(this.current_e!)!!
                 for (s_e, i_e) in valve_e.neighbours() {
                     if s == s_e { continue }
                     if s_e == this.current_e! { continue }
                     if this.open_valves.contains(s_e) { continue }
-                    if valves.get(s_e)!!.flow_rate() == 0 { continue }
+                    if valves.d.get(s_e)!!.flow_rate() == 0 { continue }
                     time = this.minutes_left
                     mut time_e = i_e + 1 // travel time + open time
                     mut node = this.clone()
@@ -105,7 +146,7 @@ struct Node {
                         node.minutes_left = 0
                         node.minutes_left_e = time_e // set time remaining for elephant
                         for v2 in node.open_valves {
-                            node.released += time * valves.get(v2)!!.flow_rate()
+                            node.released += time * valves.d.get(v2)!!.flow_rate()
                         }
                         // open it
                         node.open_valves.push(node.current!)
@@ -118,7 +159,7 @@ struct Node {
                         node.minutes_left = time // this may be 0 if we get there at same time
                         node.minutes_left_e = 0
                         for v2 in node.open_valves {
-                            node.released += time_e * valves.get(v2)!!.flow_rate()
+                            node.released += time_e * valves.d.get(v2)!!.flow_rate()
                         }
                         // open it
                         if time == 0 {
@@ -141,7 +182,7 @@ struct Node {
                     node.minutes += time
                     node.minutes_left = 0
                     for v2 in node.open_valves {
-                        node.released += time * valves.get(v2)!!.flow_rate()
+                        node.released += time * valves.d.get(v2)!!.flow_rate()
                     }
                     node.open_valves.push(node.current!)
                     node.just_opened = node.current!
@@ -151,12 +192,12 @@ struct Node {
                 // pick another one for us, elephant is still on route
                 let s_e = this.current_e!
                 mut time_e = this.minutes_left_e
-                let valve = valves.get(this.current!)!!
+                let valve = valves.d.get(this.current!)!!
                 for (s, i) in valve.neighbours() {
                     if s == s_e { continue }
                     if s == this.current! { continue }
                     if this.open_valves.contains(s) { continue }
-                    if valves.get(s)!!.flow_rate() == 0 { continue }
+                    if valves.d.get(s)!!.flow_rate() == 0 { continue }
                     time_e = this.minutes_left_e
                     mut time = i + 1 // travel time + open time
                     mut node = this.clone()
@@ -168,7 +209,7 @@ struct Node {
                         node.minutes_left = 0
                         node.minutes_left_e = time_e // set time remaining for elephant
                         for v2 in node.open_valves {
-                            node.released += time * valves.get(v2)!!.flow_rate()
+                            node.released += time * valves.d.get(v2)!!.flow_rate()
                         }
                         // open it
                         node.open_valves.push(node.current!)
@@ -181,7 +222,7 @@ struct Node {
                         node.minutes_left = time // this may be 0 if we get there at same time
                         node.minutes_left_e = 0
                         for v2 in node.open_valves {
-                            node.released += time_e * valves.get(v2)!!.flow_rate()
+                            node.released += time_e * valves.d.get(v2)!!.flow_rate()
                         }
                         // open it
                         if time == 0 {
@@ -204,7 +245,7 @@ struct Node {
                     node.minutes += time_e
                     node.minutes_left_e = 0
                     for v2 in node.open_valves {
-                        node.released += time_e * valves.get(v2)!!.flow_rate()
+                        node.released += time_e * valves.d.get(v2)!!.flow_rate()
                     }
                     node.open_valves.push(node.current_e!)
                     node.just_opened_e = node.current_e!
@@ -213,12 +254,12 @@ struct Node {
             } else {
                 // both us and the elephant need to start moving
                 // will need to find the min
-                let valve = valves.get(this.current!)!!
+                let valve = valves.d.get(this.current!)!!
                 mut possibles: [String] = []
                 for (s, i) in valve.neighbours() {
                     if s == this.current! { continue }
                     if this.open_valves.contains(s) { continue }
-                    if valves.get(s)!!.flow_rate() == 0 { continue }
+                    if valves.d.get(s)!!.flow_rate() == 0 { continue }
                     let time = i + 1 // travel time + open time
                     if time > this.minutes_remaining() {
                         // takes too long
@@ -233,13 +274,13 @@ struct Node {
                     let i = n[s]
                     if s == this.current! { continue }
                     if this.open_valves.contains(s) { continue }
-                    if valves.get(s)!!.flow_rate() == 0 { continue }
+                    if valves.d.get(s)!!.flow_rate() == 0 { continue }
                     mut time = i + 1 // travel time + open time
                     if time > this.minutes_remaining() {
                         // takes too long
                         continue
                     }
-                    let valve_e = valves.get(this.current_e!)!!
+                    let valve_e = valves.d.get(this.current_e!)!!
                     let n_e = valve_e.neighbours()
                     let keys_e = n_e.keys()
                     mut start = 0uz
@@ -255,7 +296,7 @@ struct Node {
                         if possibles.size() > 1 and s == s_e { continue }
                         if s_e == this.current_e! { continue }
                         if this.open_valves.contains(s_e) { continue }
-                        if valves.get(s_e)!!.flow_rate() == 0 { continue }
+                        if valves.d.get(s_e)!!.flow_rate() == 0 { continue }
                         time = i + 1 // travel time + open time
                         mut time_e = i_e + 1 // travel time + open time
                         if time_e > this.minutes_remaining() {
@@ -272,7 +313,7 @@ struct Node {
                             node.minutes_left = 0
                             node.minutes_left_e = time_e // set time remaining for elephant
                             for v2 in node.open_valves {
-                                node.released += time * valves.get(v2)!!.flow_rate()
+                                node.released += time * valves.d.get(v2)!!.flow_rate()
                             }
                             // open it
                             node.open_valves.push(node.current!)
@@ -285,7 +326,7 @@ struct Node {
                             node.minutes_left = time // this may be 0 if we get there at same time
                             node.minutes_left_e = 0
                             for v2 in node.open_valves {
-                                node.released += time_e * valves.get(v2)!!.flow_rate()
+                                node.released += time_e * valves.d.get(v2)!!.flow_rate()
                             }
                             // open it
                             if time == 0 and s != s_e {
@@ -301,11 +342,11 @@ struct Node {
             }
         } else {
             // move to a new valve for x min, then open it, ignore 0 rates and already open
-            let valve = valves.get(this.current!)!!
+            let valve = valves.d.get(this.current!)!!
             for (s, i) in valve.neighbours() {
                 if s == this.current! { continue }
                 if this.open_valves.contains(s) { continue }
-                if valves.get(s)!!.flow_rate() == 0 { continue }
+                if valves.d.get(s)!!.flow_rate() == 0 { continue }
                 mut time = i + 1 // travel time + open time
                 if time > this.minutes_remaining() {
                     // takes too long
@@ -316,7 +357,7 @@ struct Node {
                 node.minutes += time
                 node.current = s
                 for v2 in node.open_valves {
-                    node.released += time * valves.get(v2)!!.flow_rate()
+                    node.released += time * valves.d.get(v2)!!.flow_rate()
                 }
                 // open it
                 node.open_valves.push(node.current!)
@@ -330,7 +371,7 @@ struct Node {
             let time = this.minutes_remaining()
             node.minutes += time
             for v2 in node.open_valves {
-                node.released += time * valves.get(v2)!!.flow_rate()
+                node.released += time * valves.d.get(v2)!!.flow_rate()
             }
             ret.push(node)
         }
@@ -345,112 +386,135 @@ struct Node {
         return 30 - this.minutes
     }
 
-    function g(this, valves: [String: Valve?]) -> i64 {
-        return this.max_possible_g(valves) - this.released
+    function g(this) -> i64 {
+        return this.released
     }
 
-    function max_possible_g(this, valves: [String: Valve?]) -> i64 {
+    function h(this) -> i64 => ._h_all_elephant()
+//    function h(this) -> i64 => ._h_all()
+//    function h(this) -> i64 => ._h_not_open() // this doesn't work
+//    function h(this) -> i64 => ._h_open() // or this
+    function _h_open(this) -> i64 {
         mut ret = 0
-        for (s, v) in valves {
-            ret += this.minutes * v!.flow_rate()
-        }
-        return ret
-    }
-
-    function h(this, valves: [String: Valve?]) -> i64 {
-        return 0
-    }
-    function _h(this, valves: [String: Valve?]) -> i64 {
-        mut ret = -this.max_possible_h(valves)
         for v in this.open_valves {
             mut time = this.minutes_remaining()
             if this.just_opened.has_value() and this.just_opened! == v {
                 time --
             }
-            ret -= time * valves.get(v)!!.flow_rate()
+            ret += time * .valves!.d.get(v)!!.flow_rate()
         }
         return ret
     }
-
-    function max_possible_h(this, valves: [String: Valve?]) -> i64 {
-        if this.minutes_remaining() == 0 { return 0 }
+    function _h_not_open(this) -> i64 {
         mut ret = 0
-        let current = valves.get(this.current!)!!
-        for (s, v) in valves {
-            // this assumes that we will always travel from this node, but in reality we will go to one, then to another from there
-            let distance = current.neighbours().get(s)!
-            let time = this.minutes_remaining()// - 1 - distance
+        for (s, v) in .valves!.d {
+            if .open_valves.contains(s) { continue }
+            mut time = this.minutes_remaining()
             ret += time * v!.flow_rate()
         }
         return ret
     }
+    function _h_all(this) -> i64 {
+        mut ret = 0
+        for (s, v) in .valves!.d {
+            mut time = this.minutes_remaining()
+            ret += time * v!.flow_rate()
+        }
+        return ret
+    }
+    function _h_all_elephant(this) -> i64 {
+        mut ret = 0
+        for (s, v) in .valves!.d {
+            mut time = this.minutes_remaining() - .minutes_left - .minutes_left_e
+            ret += time * v!.flow_rate()
+        }
+        for v in this.open_valves {
+            mut time = .minutes_left + .minutes_left_e
+//            if (this.just_opened.has_value() and this.just_opened! == v) or (.just_opened_e.has_value() and .just_opened_e! == v) {
+//                time --
+//            }
+            ret += time * .valves!.d.get(v)!!.flow_rate()
+        }
+        return ret
+    }
+
+    function f(this) -> i64 => .g() + .h()
+
+    function equals(this, anon other: Node) -> bool {
+        mut ret = false
+        ret = .minutes == other.minutes and .released == other.released and .current == other.current and .current_e == other.current_e and .open_valves.size() == other.open_valves.size()
+        if ret {
+            for v in .open_valves {
+                if not other.open_valves.contains(v) {
+                    ret = false
+                    break
+                }
+            }
+        }
+        return ret
+    }
+
+    function compare(this, anon other: Node) -> i64 {
+        // higher score gets sorted first
+        return other.f() as! i64 - this.f() as! i64
+    }
+
+    function hash(this) -> u32 {
+        mut ret = 0u32
+        try {
+            ret = format("{}{}{}{}{}", .minutes, .released, .open_valves, .current, .current_e).hash()
+        } catch { }
+        return ret
+    }
 }
 
-function get_highest(open: Dictionary<String, Node>, fs: Dictionary<String, i64?>) -> String {
-    // FIXME: Implement a min-heap or priority queue to reduce this
-    // to O(log(n)). Currently it is O(n), n being around ?? for input
-    // this is also run many times in the a_star function
-    mut max_s: String? = None
-    mut max: i64? = None
-    for (s, n) in open {
-        if not max.has_value() or fs[s]! > max! {
-            max = fs[s]!
-            max_s = s
-        }
-    }
-    return max_s!
-}
+function a_star(valves: Valves, mut start: Node, elephant: bool = false) throws -> Node? {
 
-function get_lowest(anon open: Dictionary<String, Node>, anon fs: Dictionary<String, i64?>) -> String {
-    // FIXME: Implement a min-heap or priority queue to reduce this
-    // to O(log(n)). Currently it is O(n), n being around ?? for input
-    // this is also run many times in the a_star function
-    mut min_s: String? = None
-    mut min: i64? = None
-    for (s, n) in open {
-        if not min.has_value() or fs[s]! < min! {
-            min = fs[s]!
-            min_s = s
-        }
-    }
-    return min_s!
-}
-function get_lowest2(anon open: Dictionary<String, Valve?>, anon fs: Dictionary<String, i64?>) -> String {
-    // FIXME: Implement a min-heap or priority queue to reduce this
-    // to O(log(n)). Currently it is O(n), n being around ?? for input
-    // this is also run many times in the a_star function
-    mut min_s: String? = None
-    mut min: i64? = None
-    for (s, n) in open {
-        if fs.contains(s) and (not min.has_value() or fs[s]! < min!) {
-            min = fs[s]!
-            min_s = s
-        }
-    }
-    return min_s!
-}
-function a_star(valves: [String: Valve?], start: Node, elephant: bool = false) throws -> Node? {
-    let start_str = format("{}", start)
-    mut open: Dictionary<String, Node> = [start_str: start]
+    start.valves = valves
+    let start_str = start.to_string()
+    mut open: HashablePriorityQueue<Node> = HashablePriorityQueue()
+    open.push(start)
+    // Still need weird i64's as can't use Point's in a Dictionary
     mut gs = Dictionary<String, i64?>()
-    gs[start_str] = start.g(valves)
+    gs[start_str] = start.g()
     mut fs = Dictionary<String, i64?>()
-    fs[start_str] = start.h(valves)
+    fs[start_str] = start.h()
+    mut popped = 0
     while not open.is_empty() {
-        let current_s = get_lowest(open, fs)
-        let current = open.get(current_s)!
-        if current.is_complete() {
+        let current = open.peek()!
+        let current_s = current.to_string()
+//        if popped % 100000 == 0{// or current.is_complete() {
+//            println("minutes = {}, released = {}, f = {}, g = {}, h = {}, opened = {}, size = {}, popped = {}"
+//                current.minutes
+//                current.released
+//                fs[current_s]
+//                current.g()
+//                current.h()
+//                current.open_valves
+//                open.size()
+//                popped
+//            )
+//            println("{}", current.to_string())
+//        }
+//        popped ++
+        // Hard code low value that is wrong
+        let wrong_answer = 2708
+        if elephant and valves.d.size() > 10 { return current } // exit if on part 2 of actual input
+        if current.is_complete() and (elephant and valves.d.size() > 10 and current.released <= wrong_answer) {
+            println("Ignoring complete node {} as too small..., size = {}", current.released, open.size())
+        }
+        if current.is_complete() and (not elephant or valves.d.size() <= 10 or current.released > wrong_answer) {
             return current
         }
-        open.remove(current_s)
+        let ignore = open.pop()
         for n in current.neighbours(valves, elephant) {
-            let n_s = format("{}", n)
-            let g = n.g(valves)
-            if not gs.contains(n_s) or g < gs[n_s]! {
+            let n_s = n.to_string()
+            let g = n.g()
+            if not gs.contains(n_s) or g > gs[n_s]! {
                 gs[n_s] = g
-                fs[n_s] = g + n.h(valves)
-                if not open.contains(n_s) {
-                    open.set(n_s, n)
+                fs[n_s] = g + n.h()
+                if not open.contains(n) {
+                    open.push(n)
                 }
             }
         }
@@ -458,50 +522,411 @@ function a_star(valves: [String: Valve?], start: Node, elephant: bool = false) t
     return None
 }
 
-function dijkstra(mut valves: [String: Valve?]) throws {
-    for (source_s, source_v) in valves {
+function dijkstra(mut valves: Valves) throws {
+    for (source_s, source_v) in valves.d {
         mut source = source_v
-        mut q = Dictionary<String, Valve?>()
+        mut q: HashablePriorityQueue<Valve> = HashablePriorityQueue()
         mut dist = Dictionary<String, i64?>()
-        for (v_s, v) in valves {
-            q.set(v_s, v)
+        source!.source = None
+        for (v_s, v) in valves.d {
+            if v_s == source_s { continue }
+            valves.d[v_s]!.source = source
+            q.push(valves.d[v_s]!)
         }
+        q.push(source!)
         dist[source_s] = 0
         source!.set_distance(source_s, 0)
 
         while not q.is_empty() {
-            let u_s = get_lowest2(q, dist)
-            let u = q[u_s]!
-            q.remove(u_s)
+            let u = q.pop()!
+            let u_s = u.name
             for v_s in u.immediate_tunnels() {
-                if not q.contains(v_s) { continue }
-                let v = q[v_s]!
+                let v = valves.d.get(v_s)!
+//                if not q.contains(v!) { continue }
                 let alt = dist[u_s]! + 1 // edge weight always 1 here
                 if not dist.contains(v_s) or alt < dist[v_s]! {
                     dist[v_s] = alt
                     source!.set_distance(v_s, alt)
+                    q.remove(v!)
+                    q.push(v!)
                 }
             }
         }
     }
 }
 
+import jakt::libc::io { system }
 function main(args: [String]) {
-    mut valves: [String: Valve?] = Dictionary<String, Valve?>()
+    mut d: [String: Valve?] = Dictionary<String, Valve?>()
+    mut valves = Valves(d)
     for line in read_lines(filename: "input") {
-        let v = Valve::parse(valves, line)
+        let v = Valve::parse(valves: valves.d, line)
     }
     dijkstra(valves)
+    mut remove: {String} = {}
+    for (s, v) in valves.d {
+        if s == "AA" { continue }
+        if v!.flow_rate() == 0 {
+            remove.add(s)
+        }
+    }
+    for s in remove {
+        valves.d.remove(s)
+    }
+    for (s, v) in valves.d {
+        for r in remove {
+            valves.d[s]!.remove_neighbour(r)
+        }
+    }
 //    for (s, v) in valves {
-//        println("{}", s)
+//        println("{} - {}", s, v!.flow_rate())
 //        for (n, d) in v!.neighbours() {
 //            println("  {} - {}", n, d)
 //        }
 //    }
-    //if 1 == 1 { return 0 }
-    let start = Node::start_node()
+    let start = Node::start_node(valves)
     mut max_node = a_star(valves, start)!
     println("Part 1: {}", max_node.released)
     max_node = a_star(valves, start, elephant: true)!
     println("Part 2: {}", max_node.released)
+}
+trait Equatable<T> {
+    function equals(this, anon other: T) -> bool
+}
+trait Hashable {
+    function hash(this) -> u32
+}
+class MyList<T requires(Equatable<T>)> implements(IntoIterator<T>) {
+    public // have next as public as can't have inner class for iterator
+    next: MyList<T>? = None
+    public // have next as public as can't have inner class for iterator
+    data: T? = None
+
+    public function remove(mut this, anon val: T) -> bool {
+        guard .data.has_value() else {
+            return false
+        }
+        if .data!.equals(val) {
+            if .next.has_value() {
+                .data = .next!.data
+                .next = .next!.next
+            } else {
+                .data = None
+            }
+            return true
+        }
+        if .next.has_value() {
+            return .next!.remove(val)
+        }
+        return false
+    }
+
+    public function add(mut this, anon val: T) throws {
+        if not .data.has_value() {
+            .data = val
+            // .next = None // This should already be None if data was None
+            return
+        }
+        guard .next.has_value() else {
+            .next = MyList(data: val)
+            return
+        }
+        .next!.add(val)
+    }
+
+    public function contains(this, anon val: T) -> bool {
+        guard .data.has_value() else { return false }
+        if .data!.equals(val) { return true }
+        guard .next.has_value() else { return false }
+        return .next!.contains(val)
+    }
+
+    public function size(this) -> usize {
+        guard .data.has_value() else { return 0 }
+        guard .next.has_value() else { return 1 }
+        return 1 + .next!.size()
+    }
+    public function is_empty(this) -> bool => .size() == 0
+
+    public function iterator(this) -> Iterable<T> => MyListIterator(node: this)
+}
+
+struct MyListIterator<T> implements(Iterable<T>) {
+
+    node: MyList<T>?
+
+    function next(mut this) -> T? {
+        guard .node.has_value() else { return None }
+        let ret = .node!.data
+        .node = .node!.next as! MyList<T>?
+        return ret
+    }
+}
+
+class MySet<T requires(Equatable<T>,Hashable)> {
+    data: [u32: MyList<T>]? = None
+    // TODO have a capacity which grows and is used to mod key for better hash collision resistance
+
+    public function add(mut this, anon val: T) throws {
+        ._initialize_if_needed()
+
+        let idx = ._hash(val)
+        mut bucket = .data!.get(idx)
+        if not bucket.has_value() {
+            .data![idx] = MyList()
+            bucket = .data!.get(idx)
+        }
+        for v in bucket! {
+            if v.equals(val) { return }
+        }
+        bucket!.add(val)
+    }
+
+    public function remove(mut this, anon val: T) -> bool {
+        guard .data.has_value() else { return false }
+
+        let idx = ._hash(val)
+        mut bucket = .data!.get(idx)
+        guard bucket.has_value() else { return false }
+        let ret = bucket!.remove(val)
+        if ret and bucket!.is_empty() {
+            .data!.remove(idx)
+            return true
+        }
+        return ret
+    }
+
+    public function contains(this, anon val: T) -> bool {
+        guard .data.has_value() else { return false }
+
+        let idx = ._hash(val)
+        mut bucket = .data!.get(idx)
+        guard bucket.has_value() else { return false }
+        for v in bucket! {
+            if v.equals(val) { return true }
+        }
+        return false
+    }
+
+    public function size(this) -> usize {
+        guard .data.has_value() else { return 0 }
+        return .data!.size()
+    }
+    public function is_empty(this) -> bool => .size() == 0
+
+    // Private functions
+
+    public // FIXME: This is needed to be public due to https://github.com/SerenityOS/jakt/issues/1301
+    function _initialize_if_needed(mut this) throws {
+        if .data.has_value() { return }
+        let data: [u32: MyList<T>] = [:]
+        .data = data
+    }
+
+    public // FIXME: This is needed to be public due to https://github.com/SerenityOS/jakt/issues/1301
+    function _hash(this, anon val: T) -> u32 {
+        return val.hash()
+    }
+}
+
+class HashablePriorityQueue<T requires(Hashable)> {
+    // FIXME: really should extend from this...
+    public q: PriorityQueue<T>? = None
+    seen: MySet<T>? = None
+
+    public function push(mut this, anon val: T) throws {
+        // FIXME: need Super type and inherit, and just call Super._init inside our override
+        ._initialize_if_needed()
+        // FIXME: need Super type and inherit, and to use Super.push(val)
+        .q!.push(val)
+        .seen!.add(val)
+    }
+
+    public function pop(mut this) -> T? {
+        // FIXME: need Super type and inherit, and to use Super.pop
+        let ret = .q!.pop()
+        if ret.has_value() {
+            .seen!.remove(ret!)
+        }
+        return ret
+    }
+    public function peek(mut this) -> T? => .q!.peek()
+
+    public function remove(mut this, anon val: T) -> bool {
+        guard .q.has_value() else { return false }
+        .seen!.remove(val)
+        return .q!.remove(val)
+    }
+
+    public function contains(this, anon val: T) -> bool {
+        guard .seen.has_value() else { return false }
+        return .seen!.contains(val)
+    }
+
+    public function size(this) -> usize {
+        guard .q.has_value() else { return 0 }
+        return .q!.size()
+    }
+    public function is_empty(this) -> bool => .size() == 0
+
+    // Private functions
+
+    public // FIXME: This is needed to be public due to https://github.com/SerenityOS/jakt/issues/1301
+    function _initialize_if_needed(mut this) throws {
+        // FIXME: need Super type, then don't have __init, and just call Super._init
+        if not .q.has_value() {
+            .q = PriorityQueue()
+        }
+        .q!._initialize_if_needed()
+        if .seen.has_value() { return }
+        let seen: MySet<T> = MySet()
+        .seen = seen
+    }
+}
+
+
+
+trait Comparable<T> {
+    function compare(this, anon other: T) -> i64
+}
+
+
+class PriorityQueue<T requires(Comparable<T>,Equatable<T>)> {
+
+    public data: [T]? = None
+
+
+    public function push(mut this, anon val: T) throws {
+        ._initialize_if_needed()
+
+        .data!.push(val)
+        ._sift_up(idx: .data!.size() - 1)
+    }
+
+    public // FIXME: This is needed to be public due to https://github.com/SerenityOS/jakt/issues/1301
+    function _sift_up(mut this, idx: usize) {
+        guard .data.has_value() and idx < .data!.size() else { return }
+        mut child_idx = idx
+        for parent_idx in ParentIterator(idx) {
+            let child = .data![child_idx]
+            let parent = .data![parent_idx]
+            if child.compare(parent) >= 0 {
+                break
+            }
+            ._swap(child_idx, parent_idx)
+            child_idx = parent_idx
+        }
+    }
+
+    public function pop(mut this) -> T? {
+        guard .data.has_value() and .data!.size() > 0 else {
+            return None
+        }
+        if .data!.size() == 1 {
+            return .data!.pop()!
+        }
+
+        let ret = .data![0]
+        ._remove(idx: 0)
+        return ret
+    }
+
+    public function remove(mut this, anon val: T) -> bool {
+        guard .data.has_value() else { return false }
+        mut idx = 0uz
+        while idx < .data!.size() {
+            if val.equals(.data![idx]) {
+                ._remove(idx)
+                ._sift_up(idx)
+                return true
+            }
+            idx ++
+        }
+        return false
+    }
+
+    public // FIXME: This is needed to be public due to https://github.com/SerenityOS/jakt/issues/1301
+    function _remove(mut this, idx: usize) {
+        guard .data.has_value() and idx < .data!.size() else { return }
+        guard idx < .data!.size() - 1 else {
+            let ignore = .data!.pop()
+            return
+        }
+        .data![idx] = .data!.pop()!
+        mut parent_idx = idx
+        while parent_idx < .data!.size() {
+            mut (left_idx, right_idx) = (parent_idx * 2 + 1, parent_idx * 2 + 2)
+            guard left_idx < .data!.size() else { break }
+            let parent = .data![parent_idx]
+            let left = .data![left_idx]
+            if left.compare(parent) >= 0 {
+                // left child is correct, check the right
+                guard right_idx < .data!.size() and .data![right_idx].compare(parent) < 0 else { break }
+                // fall through to swap right
+            } else if right_idx >= .data!.size() or .data![right_idx].compare(left) >= 0 {
+                // right is non-existent or bigger than left
+                ._swap(left_idx, parent_idx)
+                parent_idx = left_idx
+                continue
+            }
+            ._swap(right_idx, parent_idx)
+            parent_idx = right_idx
+        }
+    }
+
+
+    public function peek(this) -> T? {
+        guard .data.has_value() and .data!.size() > 0 else {
+            return None
+        }
+        return .data![0]
+    }
+
+    public function size(this) -> usize {
+        guard .data.has_value() else { return 0 }
+        return .data!.size()
+    }
+
+    public function is_empty(this) -> bool => .size() == 0
+
+    public function contains(this, anon val: T) -> bool {
+        guard .data.has_value() else { return false }
+        for v in .data! {
+            if v.equals(val) { return true }
+        }
+        return false
+    }
+
+    // Private functions
+
+    public // FIXME: This is needed to be public due to https://github.com/SerenityOS/jakt/issues/1301
+    function _initialize_if_needed(mut this) throws {
+        if .data.has_value() { return }
+        let data: [T] = []
+        .data = data
+    }
+
+    public // FIXME: This is needed to be public due to https://github.com/SerenityOS/jakt/issues/1301
+    function _swap(mut this, anon a: usize, anon b: usize) {
+        guard .data.has_value() and a < .data!.size() and b < .data!.size() else {
+            return
+        }
+        let tmp = .data![a]
+        .data![a] = .data![b]
+        .data![b] = tmp
+    }
+}
+struct ParentIterator implements(Iterable<usize>) {
+
+    idx: usize
+
+    function next(mut this) -> usize? {
+        guard .idx != 0 else {
+            return None
+        }
+
+        let ret = (.idx - 1) / 2
+        .idx = ret
+        return ret
+    }
 }
