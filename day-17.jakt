@@ -1,0 +1,142 @@
+import helpers { read_lines }
+
+struct Point {
+    x: i64
+    y: i64
+}
+
+class Brick {
+    points: [Point]
+
+    public function height(this) -> usize {
+        return 0uz
+    }
+
+    public function width(this) -> usize {
+        return 0uz
+    }
+}
+
+class BrickIterator implements(Iterable<Brick>) {
+    data: [Brick]
+    it: ArrayIterator<Brick>
+
+    public function construct() throws -> BrickIterator {
+        mut data: [Brick] = []
+
+        {
+            // ####
+            mut points: [Point] = []
+            points.push(Point(x: 0, y: 0))
+            points.push(Point(x: 1, y: 0))
+            points.push(Point(x: 2, y: 0))
+            points.push(Point(x: 3, y: 0))
+            data.push(Brick(points))
+        }
+
+        {
+            // .#.
+            // ###
+            // .#.
+            mut points: [Point] = []
+            points.push(Point(x: 1, y: 0))
+            points.push(Point(x: 0, y: 1))
+            points.push(Point(x: 1, y: 1))
+            points.push(Point(x: 2, y: 1))
+            points.push(Point(x: 1, y: 2))
+            data.push(Brick(points))
+        }
+
+        {
+            // ..#
+            // ..#
+            // ###
+            mut points: [Point] = []
+            points.push(Point(x: 2, y: 0))
+            points.push(Point(x: 2, y: 1))
+            points.push(Point(x: 0, y: 2))
+            points.push(Point(x: 1, y: 2))
+            points.push(Point(x: 2, y: 2))
+            data.push(Brick(points))
+        }
+
+        {
+            // #
+            // #
+            // #
+            // #
+            mut points: [Point] = []
+            points.push(Point(x: 0, y: 0))
+            points.push(Point(x: 0, y: 1))
+            points.push(Point(x: 0, y: 2))
+            points.push(Point(x: 0, y: 3))
+            data.push(Brick(points))
+        }
+
+        {
+            // ##
+            // ##
+            mut points: [Point] = []
+            points.push(Point(x: 0, y: 0))
+            points.push(Point(x: 1, y: 0))
+            points.push(Point(x: 0, y: 1))
+            points.push(Point(x: 1, y: 1))
+            data.push(Brick(points))
+        }
+
+        return BrickIterator(data, it: data.iterator())
+    }
+
+    public function next(mut this) -> Brick? {
+        let ret = .it.next()
+        if not ret.has_value() {
+            .it = .data.iterator()
+            return .it.next()
+        }
+        return ret
+    }
+}
+
+enum Jet {
+    LEFT
+    RIGHT
+}
+
+class JetIterator implements(Iterable<Jet>) {
+    data: [Jet]
+    it: ArrayIterator<Jet>
+
+    public function construct(anon s: String) throws -> JetIterator {
+        mut data: [Jet] = []
+        mut idx = 0uz
+        while idx < s.length() {
+            let jet = match s.byte_at(idx) {
+                b'<' => Some(Jet::LEFT)
+                b'>' => Some(Jet::RIGHT)
+                else => None
+            }
+            if not jet.has_value() {
+                abort()
+            }
+            data.push(jet!)
+            idx++
+        }
+        return JetIterator(data, it: data.iterator())
+    }
+
+    public function next(mut this) -> Jet? {
+        let ret = .it.next()
+        if not ret.has_value() {
+            .it = .data.iterator()
+            return .it.next()
+        }
+        return ret
+    }
+}
+
+function main(args: [String]) {
+    let input = read_lines(filename: "input")[0]
+    let brick_it = BrickIterator::construct()
+    let jet_it = JetIterator::construct(input)
+    println("Part 1: {}", "TODO")
+}
