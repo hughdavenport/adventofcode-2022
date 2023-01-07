@@ -104,7 +104,8 @@ for DAY in $(seq "${START}" "${END}"); do
   if [ ! -f "$EXE" ] || [ "$JAKT_FILE" -nt "$EXE" ]; then
     echo "Testing compiling ${JAKT_FILE}: "
     rm "./build/day-${DAY}" 2>/dev/null
-    ${JAKT} "$JAKT_FILE"
+    ./build.sh "day-${DAY}"
+#    ${JAKT} "$JAKT_FILE"
     if [ $? -eq 0 -a -x "$EXE" ]; then
         pass
     fi
