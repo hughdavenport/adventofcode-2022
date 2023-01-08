@@ -1,23 +1,7 @@
-import helpers { read_lines }
+import helpers { read_lines, panic, min, max }
 
-struct Point {
-    x: i64
-    y: i64
-}
 
-class Brick {
-    points: [Point]
-
-    public function height(this) -> usize {
-        return 0uz
-    }
-
-    public function width(this) -> usize {
-        return 0uz
-    }
-}
-
-class BrickIterator implements(Iterable<Brick>) {
+class BrickIterator implements(ThrowingIterable<Brick>) {
     data: [Brick]
     it: ArrayIterator<Brick>
 
@@ -87,13 +71,14 @@ class BrickIterator implements(Iterable<Brick>) {
         return BrickIterator(data, it: data.iterator())
     }
 
-    public function next(mut this) -> Brick? {
-        let ret = .it.next()
+
+    public function next(mut this) throws -> Brick? {
+        mut ret = .it.next()
         if not ret.has_value() {
             .it = .data.iterator()
-            return .it.next()
+            ret = .it.next()
         }
-        return ret
+        return Some(ret!.clone())
     }
 }
 
@@ -134,9 +119,215 @@ class JetIterator implements(Iterable<Jet>) {
     }
 }
 
+class Point {
+    public x: usize
+    public y: usize
+
+    public function canOffset(this, dx: i64, dy: i64) -> bool {
+        guard dx >= -(.x as! i64) and dy >= -(.y as! i64) else { return false }
+        return true
+    }
+
+    public function offset(mut this, dx: i64, dy: i64) {
+        guard .canOffset(dx, dy) else { return }
+        .x = (.x as! i64 + dx) as! usize
+        .y = (.y as! i64 + dy) as! usize
+    }
+}
+
+struct Brick {
+    points: [Point]
+
+    function clone(this) throws -> Brick {
+        mut points: [Point] = []
+        for p in .points {
+            points.push(Point(x: p.x, y: p.y))
+        }
+        return Brick(points)
+    }
+
+    function height(this) -> usize {
+        guard not .points.is_empty() else { return 0 }
+        mut min_y = .points[0].y
+        mut max_y = min_y
+        for p in .points {
+            min_y = min(min_y, p.y)
+            max_y = max(max_y, p.y)
+        }
+        return (max_y - min_y) as! usize + 1
+    }
+
+    function canOffset(this, dx: i64, dy: i64) -> bool {
+        for p in .points {
+            if not p.canOffset(dx, dy) { return false }
+        }
+        return true
+    }
+
+    function offset(mut this, dx: i64, dy: i64) {
+        guard .canOffset(dx, dy) else { return }
+        for p in .points {
+            p.offset(dx, dy)
+        }
+    }
+
+    function overlaps(this, x: usize, y: usize) -> bool {
+        for p in .points {
+            if p.x == x and p.y == y {
+                return true
+            }
+        }
+        return false
+    }
+}
+
+enum Cell {
+    BRICK
+    EMPTY
+}
+
+class Simulator {
+    brick_it: BrickIterator
+    jet_it: JetIterator
+    chamber: [[Cell]]
+
+    public function to_string(this, brick: Brick? = None) throws -> String {
+        guard not .chamber.is_empty() else { return "" }
+        mut ret = StringBuilder::create()
+        for y in 0..this.chamber.size() {
+            let row = .chamber[y]
+            ret.append(b'|')
+            for x in 0..row.size() {
+                if brick.has_value() and brick!.overlaps(x, y) {
+                    ret.append_string("\e[1m@\e[m")
+                } else {
+                    let cell = row[x]
+                    ret.append(match cell {
+                        BRICK => b'#'
+                        EMPTY => b'.'
+                    })
+                }
+            }
+            ret.append(b'|')
+            ret.append(b'\n')
+        }
+        ret.append(b'+')
+        for cell in .chamber[0] {
+            ret.append(b'-')
+        }
+        ret.append(b'+')
+        ret.append(b'\n')
+        return ret.to_string()
+    }
+
+    function applyWind(mut this, mut b: Brick, wind: Jet) -> bool {
+        let dy = 0
+        let dx = match wind {
+            LEFT => -1
+            RIGHT => 1
+        }
+        guard b.canOffset(dx, dy) else { return false }
+        b.offset(dx, dy)
+        if .overlaps(b) {
+            b.offset(dx: -dx, dy)
+            return false
+        }
+        return true
+    }
+
+    function overlaps(this, b: Brick) -> bool {
+        for p in b.points {
+            guard p.y < .chamber.size() and p.x < .chamber[p.y].size() else { return true }
+            if .chamber[p.y][p.x] is BRICK() {
+                return true
+            }
+        }
+        return false
+    }
+
+    function dropOne(mut this, mut b: Brick) -> bool {
+        b.offset(dx: 0, dy: 1)
+        if .overlaps(b) {
+            b.offset(dx: 0, dy: -1)
+            return false
+        }
+        return true
+    }
+
+    public function construct(anon s: String) throws -> Simulator {
+        return Simulator(
+            brick_it: BrickIterator::construct()
+            jet_it: JetIterator::construct(s)
+            chamber: []
+        )
+    }
+
+    function addSpaceForBrick(mut this, mut b: Brick) throws {
+        let currentEmpty = (.chamber.size() - .height()) as! i64
+        let neededHeight = (b.height() + 3 + .height()) as! i64 - .chamber.size() as! i64
+        if neededHeight >= 0 {
+            for i in 0..neededHeight {
+                // FIXME, this is inefficient, better to flip the array and have getters/setters
+                .chamber.insert(before_index: 0uz, value: [Cell::EMPTY();7])
+            }
+        } else {
+            b.offset(dx: 0, dy: -neededHeight)
+        }
+        b.offset(dx: 2, dy: 0)
+    }
+
+    function storeBrick(mut this, b: Brick) throws {
+        for p in b.points {
+            guard p.y < .chamber.size() and p.x < .chamber[p.y].size() else {
+                panic("brick out of range on store")
+            }
+            guard .chamber[p.y][p.x] is EMPTY() else {
+                panic("brick overlapping on store")
+            }
+            .chamber[p.y][p.x] = Cell::BRICK()
+        }
+
+    }
+
+    public function simulate(mut this, debug: bool = false) throws {
+        mut b = .brick_it.next()!
+        .addSpaceForBrick(b)
+        if debug { println("Added new brick:\n{}",  .to_string(brick: b)) }
+        for jet in .jet_it {
+            .applyWind(b, wind: jet)
+            if debug { println("Applied wind {}:\n{}", jet, .to_string(brick: b)) }
+            if not .dropOne(b) {
+                .storeBrick(b)
+                break
+            }
+        }
+    }
+
+    public function height(this) -> usize {
+        mut ret = .chamber.size()
+        mut count = 0uz
+        for row in .chamber {
+            mut is_empty = true
+            for cell in row {
+                if cell is BRICK() {
+                    is_empty = false
+                    break
+                }
+            }
+            if not is_empty {
+                break
+            }
+            count ++
+        }
+        return ret - count
+    }
+}
+
 function main(args: [String]) {
     let input = read_lines(filename: "input")[0]
-    let brick_it = BrickIterator::construct()
-    let jet_it = JetIterator::construct(input)
-    println("Part 1: {}", "TODO")
+    mut s = Simulator::construct(input)
+    for i in 0..2022 {
+        s.simulate()
+    }
+    println("Part 1: {}", s.height())
 }

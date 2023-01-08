@@ -1,3 +1,11 @@
+function panic(anon s: String? = None) -> never {
+    eprintln("PANIC")
+    if s.has_value() {
+        eprintln("{}", s)
+    }
+    abort()
+}
+
 function read_lines(filename: String) throws -> [String] {
     mut ret: [String] = []
     mut file = File::open_for_reading(filename)
@@ -29,8 +37,20 @@ function min(anon a: i64, anon b: i64) -> i64 {
     }
     return b
 }
+function min(anon a: usize, anon b: usize) -> usize {
+    if a < b {
+        return a
+    }
+    return b
+}
 
 function max(anon a: i64, anon b: i64) -> i64 {
+    if a > b {
+        return a
+    }
+    return b
+}
+function max(anon a: usize, anon b: usize) -> usize {
     if a > b {
         return a
     }
