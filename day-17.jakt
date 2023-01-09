@@ -322,18 +322,84 @@ class Simulator {
     }
 }
 
+function is_cycle(anon a: [usize], idx: usize, length: usize) -> bool {
+    for i in 0..length {
+        guard idx + 3*length + i < a.size() else { return false }
+        if a[idx+i] != a[idx+length+i] {
+            return false
+        }
+        if a[idx+i] != a[idx+2*length+i] {
+            return false
+        }
+        if a[idx+i] != a[idx+3*length+i] {
+            return false
+        }
+    }
+    return true
+}
+
+function brent(anon a: [usize]) -> (usize, usize) {
+
+    mut p = 1uz
+    mut l = 1uz
+    mut t = 0uz
+    mut h = t + 1
+    while a[t] != a[h] or not is_cycle(a, idx: t, length: l) {
+        if p == l {
+            t = h
+            p *= 2
+            l = 0uz
+        }
+        h ++
+        l ++
+    }
+
+    t = 0uz
+    h = t + l
+
+    mut m = 0uz
+    while a[t] != a[h] or not is_cycle(a, idx: t, length: l) {
+        t ++
+        h ++
+        m ++
+    }
+    return (l, m)
+}
+
 function main(args: [String]) {
     let input = read_lines(filename: "input")[0]
     mut s = Simulator::construct(input)
+    mut diffs: [usize] = []
+    mut lastSize = 0uz
+    mut rounds = 0uz
     for i in 0..2022 {
         s.simulate()
+        diffs.push(s.height() - lastSize)
+        lastSize = s.height()
+        rounds ++
     }
     println("Part 1: {}", s.height())
-    for i in 0..(1000000000000-2022) {
+    while rounds < 10000 {
+        rounds ++
         s.simulate()
-        if (i+2022+1) % 10000 == 0 {
-            println("after {} steps, height = {}", i+2022+1, s.height())
-        }
+        diffs.push(s.height() - lastSize)
+        lastSize = s.height()
     }
-    println("Part 2: {}", s.height())
+    let (length, idx) = brent(diffs)
+    mut cycleSize = 0uz
+    for i in idx..(idx+length) {
+        cycleSize += diffs[i]
+    }
+    let search = 1000000000000uz
+    let roundsToGo = search - rounds
+    lastSize += ((roundsToGo-idx) / length) * cycleSize
+    let startIdx = (rounds-idx)%length
+    for i in startIdx..length {
+        lastSize += diffs[idx+i]
+    }
+    let endIdx = (search-idx)%length
+    for i in 0..endIdx {
+        lastSize += diffs[idx+i]
+    }
+    println("Part 2: {}", lastSize)
 }
