@@ -1,0 +1,103 @@
+import helpers { read_lines, panic, abs }
+
+class Cube {
+    x: i64
+    y: i64
+    z: i64
+
+    public function construct(anon s: String) throws -> Cube {
+        let split = s.split(',')
+        let x = split[0].to_int()! as! i64
+        let y = split[1].to_int()! as! i64
+        let z = split[2].to_int()! as! i64
+        return Cube(x, y, z)
+    }
+
+    public function touches(this, cube: Cube) -> bool {
+        if .x == cube.x and .y == cube.y and abs(.z-cube.z) == 1 {
+            return true
+        }
+        if .x == cube.x and .z == cube.z and abs(.y-cube.y) == 1 {
+            return true
+        }
+        if .z == cube.z and .y == cube.y and abs(.x-cube.x) == 1 {
+            return true
+        }
+        return false
+    }
+}
+
+class Surface {
+    cubes: [Cube]
+    _edges: usize = 0
+    public invalid: bool = false
+
+    public function construct(cube: Cube) throws -> Surface {
+        return Surface(cubes: [cube], _edges: 6)
+    }
+
+    public function touches(this, cube: Cube) -> bool {
+        guard not .invalid else { return false }
+        for c in .cubes {
+            if c.touches(cube) {
+                return true
+            }
+        }
+        return false
+    }
+
+    public function join(mut this, cube: Cube) throws {
+        guard not .invalid else { return }
+        ._edges += 6
+        for c in .cubes {
+            if c.touches(cube) {
+                ._edges -= 2
+            }
+        }
+        .cubes.push(cube)
+    }
+
+    public function join(mut this, surface: Surface) throws {
+        guard not .invalid else { return }
+        for c in surface.cubes {
+            .join(cube: c)
+        }
+    }
+
+    public function edges(this) -> usize {
+        guard not .invalid else { return 0uz }
+        return ._edges
+    }
+}
+
+function main(args: [String]) {
+    mut surfaces: [Surface] = []
+    for line in read_lines(filename: "input") {
+        let cube = Cube::construct(line)
+        mut touching: [Surface] = []
+        for s in surfaces {
+            if s.touches(cube) {
+                touching.push(s)
+            }
+        }
+        if touching.is_empty() {
+            surfaces.push(Surface::construct(cube))
+        } else {
+            if touching.size() > 1 {
+                touching[0].join(cube)
+                for i in 1..touching.size() {
+                    touching[0].join(surface: touching[i])
+                    // TODO it would be better if we just remove this from the surfaces array, but there is no remove function...
+                    touching[i].invalid = true
+                }
+            } else {
+                touching[0].join(cube)
+            }
+        }
+    }
+    mut edges = 0uz
+    for s in surfaces {
+        edges += s.edges()
+    }
+    println("Part 1: {}", edges)
+}
