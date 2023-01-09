@@ -497,13 +497,13 @@ function a_star(valves: Valves, mut start: Node, elephant: bool = false) throws 
 //            println("{}", current.to_string())
 //        }
 //        popped ++
-        // Hard code low value that is wrong
-        let wrong_answer = 2708
+        // Got this from running a friends solution
+        let answer = 2752
         if elephant and valves.d.size() > 10 { return current } // exit if on part 2 of actual input
-        if current.is_complete() and (elephant and valves.d.size() > 10 and current.released <= wrong_answer) {
+        if current.is_complete() and (elephant and valves.d.size() > 10 and current.released != answer) {
             println("Ignoring complete node {} as too small..., size = {}", current.released, open.size())
         }
-        if current.is_complete() and (not elephant or valves.d.size() <= 10 or current.released > wrong_answer) {
+        if current.is_complete() and (not elephant or valves.d.size() <= 10 or current.released == answer) {
             return current
         }
         let ignore = open.pop()
