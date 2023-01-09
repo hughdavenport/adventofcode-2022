@@ -263,7 +263,6 @@ class Simulator {
     }
 
     function addSpaceForBrick(mut this, mut b: Brick) throws {
-        let currentEmpty = (.chamber.size() - .height()) as! i64
         let neededHeight = (b.height() + 3 + .height()) as! i64 - .chamber.size() as! i64
         if neededHeight >= 0 {
             for i in 0..neededHeight {
@@ -330,4 +329,11 @@ function main(args: [String]) {
         s.simulate()
     }
     println("Part 1: {}", s.height())
+    for i in 0..(1000000000000-2022) {
+        s.simulate()
+        if (i+2022+1) % 10000 == 0 {
+            println("after {} steps, height = {}", i+2022+1, s.height())
+        }
+    }
+    println("Part 2: {}", s.height())
 }
