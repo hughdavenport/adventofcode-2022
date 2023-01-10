@@ -1,103 +1,160 @@
-import helpers { read_lines, panic, abs }
+import helpers { read_lines, max }
 
-class Cube {
-    x: i64
-    y: i64
-    z: i64
+struct Cube {
+    x: usize
+    y: usize
+    z: usize
 
-    public function construct(anon s: String) throws -> Cube {
+    function construct(anon s: String) throws -> Cube {
         let split = s.split(',')
-        let x = split[0].to_int()! as! i64
-        let y = split[1].to_int()! as! i64
-        let z = split[2].to_int()! as! i64
+        let x = split[0].to_int()! as! usize
+        let y = split[1].to_int()! as! usize
+        let z = split[2].to_int()! as! usize
         return Cube(x, y, z)
-    }
-
-    public function touches(this, cube: Cube) -> bool {
-        if .x == cube.x and .y == cube.y and abs(.z-cube.z) == 1 {
-            return true
-        }
-        if .x == cube.x and .z == cube.z and abs(.y-cube.y) == 1 {
-            return true
-        }
-        if .z == cube.z and .y == cube.y and abs(.x-cube.x) == 1 {
-            return true
-        }
-        return false
     }
 }
 
-class Surface {
-    cubes: [Cube]
-    _edges: usize = 0
-    public invalid: bool = false
+enum Cell {
+    LAVA
+    WATER
+    AIR
+}
 
-    public function construct(cube: Cube) throws -> Surface {
-        return Surface(cubes: [cube], _edges: 6)
+function makeGrid(cubes: [Cube], size: usize) throws -> [[[Cell]]] {
+    mut grid: [[[Cell]]] = []
+    for z in 0..size {
+        mut ys: [[Cell]] = []
+        for y in 0..size {
+            ys.push([Cell::AIR(); size])
+        }
+        grid.push(ys)
     }
-
-    public function touches(this, cube: Cube) -> bool {
-        guard not .invalid else { return false }
-        for c in .cubes {
-            if c.touches(cube) {
-                return true
+    for c in cubes {
+        grid[c.z][c.y][c.x] = Cell::LAVA()
+    }
+    mut reachable: [Cube] = []
+    for a in 0..size {
+        for b in 0..size {
+            if isAir(grid, x: 0, y: a, z: b) {
+                grid[b][a][0] = Cell::WATER()
+                reachable.push(Cube(x: 0, y: a, z: b))
+            }
+            if isAir(grid, x: a, y: 0, z: b) {
+                grid[b][0][a] = Cell::WATER()
+                reachable.push(Cube(x: a, y: 0, z: b))
+            }
+            if isAir(grid, x: b, y: a, z: 0) {
+                grid[0][a][b] = Cell::WATER()
+                reachable.push(Cube(x: b, y: a, z: 0))
             }
         }
+    }
+    while not reachable.is_empty() {
+        let c = reachable.pop()!
+        if c.z >= 1 and isAir(grid, x: c.x, y: c.y, z: c.z-1) {
+            grid[c.z-1][c.y][c.x] = Cell::WATER()
+            reachable.push(Cube(x: c.x, y: c.y, z: c.z-1))
+        }
+        if c.y >= 1 and isAir(grid, x: c.x, y: c.y-1, z: c.z) {
+            grid[c.z][c.y-1][c.x] = Cell::WATER()
+            reachable.push(Cube(x: c.x, y: c.y-1, z: c.z))
+        }
+        if c.x >= 1 and isAir(grid, x: c.x-1, y: c.y, z: c.z) {
+            grid[c.z][c.y][c.x-1] = Cell::WATER()
+            reachable.push(Cube(x: c.x-1, y: c.y, z: c.z))
+        }
+        if c.z+1 < size and isAir(grid, x: c.x, y: c.y, z: c.z+1) {
+            grid[c.z+1][c.y][c.x] = Cell::WATER()
+            reachable.push(Cube(x: c.x, y: c.y, z: c.z+1))
+        }
+        if c.y+1 < size and isAir(grid, x: c.x, y: c.y+1, z: c.z) {
+            grid[c.z][c.y+1][c.x] = Cell::WATER()
+            reachable.push(Cube(x: c.x, y: c.y+1, z: c.z))
+        }
+        if c.x+1 < size and isAir(grid, x: c.x+1, y: c.y, z: c.z) {
+            grid[c.z][c.y][c.x+1] = Cell::WATER()
+            reachable.push(Cube(x: c.x+1, y: c.y, z: c.z))
+        }
+    }
+    return grid
+}
+
+function isLava(grid: [[[Cell]]], x: usize, y: usize, z: usize) -> bool {
+    guard z < grid.size() and y < grid[z].size() and x < grid[z][y].size() else {
         return false
     }
+    return grid[z][y][x] is LAVA()
+}
 
-    public function join(mut this, cube: Cube) throws {
-        guard not .invalid else { return }
-        ._edges += 6
-        for c in .cubes {
-            if c.touches(cube) {
-                ._edges -= 2
+function isAir(grid: [[[Cell]]], x: usize, y: usize, z: usize) -> bool {
+    guard z < grid.size() and y < grid[z].size() and x < grid[z][y].size() else {
+        return false
+    }
+    return grid[z][y][x] is AIR()
+}
+
+function isWater(grid: [[[Cell]]], x: usize, y: usize, z: usize) -> bool {
+    guard z < grid.size() and y < grid[z].size() and x < grid[z][y].size() else {
+        return true
+    }
+    return grid[z][y][x] is WATER()
+}
+
+function part1(grid: [[[Cell]]]) -> usize {
+    mut ret = 0uz
+    for z in 0..grid.size() {
+        for y in 0..grid[z].size() {
+            for x in 0..grid[z][y].size() {
+                if grid[z][y][x] is LAVA() {
+                    if not isLava(grid, x, y, z: z+1) { ret ++ }
+                    if z >= 1 and not isLava(grid, x, y, z: z-1) { ret ++ }
+                    if not isLava(grid, x, y: y+1, z) { ret ++ }
+                    if y >= 1 and not isLava(grid, x, y: y-1, z) { ret ++ }
+                    if not isLava(grid, x: x+1, y, z) { ret ++ }
+                    if x >= 1 and not isLava(grid, x: x-1, y, z) { ret ++ }
+                    if x == 0 { ret ++ }
+                    if y == 0 { ret ++ }
+                    if z == 0 { ret ++ }
+                }
             }
         }
-        .cubes.push(cube)
     }
+    return ret
+}
 
-    public function join(mut this, surface: Surface) throws {
-        guard not .invalid else { return }
-        for c in surface.cubes {
-            .join(cube: c)
+function part2(grid: [[[Cell]]]) -> usize {
+    mut ret = 0uz
+    for z in 0..grid.size() {
+        for y in 0..grid[z].size() {
+            for x in 0..grid[z][y].size() {
+                if grid[z][y][x] is LAVA() {
+                    if isWater(grid, x, y, z: z+1) { ret ++ }
+                    if z >= 1 and isWater(grid, x, y, z: z-1) { ret ++ }
+                    if isWater(grid, x, y: y+1, z) { ret ++ }
+                    if y >= 1 and isWater(grid, x, y: y-1, z) { ret ++ }
+                    if isWater(grid, x: x+1, y, z) { ret ++ }
+                    if x >= 1 and isWater(grid, x: x-1, y, z) { ret ++ }
+                    if x == 0 { ret ++ }
+                    if y == 0 { ret ++ }
+                    if z == 0 { ret ++ }
+                }
+            }
         }
     }
-
-    public function edges(this) -> usize {
-        guard not .invalid else { return 0uz }
-        return ._edges
-    }
+    return ret
 }
 
 function main(args: [String]) {
-    mut surfaces: [Surface] = []
+    mut cubes: [Cube] = []
+    mut max = 0uz
     for line in read_lines(filename: "input") {
         let cube = Cube::construct(line)
-        mut touching: [Surface] = []
-        for s in surfaces {
-            if s.touches(cube) {
-                touching.push(s)
-            }
-        }
-        if touching.is_empty() {
-            surfaces.push(Surface::construct(cube))
-        } else {
-            if touching.size() > 1 {
-                touching[0].join(cube)
-                for i in 1..touching.size() {
-                    touching[0].join(surface: touching[i])
-                    // TODO it would be better if we just remove this from the surfaces array, but there is no remove function...
-                    touching[i].invalid = true
-                }
-            } else {
-                touching[0].join(cube)
-            }
-        }
+        cubes.push(cube)
+        max = max(max, cube.x)
+        max = max(max, cube.y)
+        max = max(max, cube.z)
     }
-    mut edges = 0uz
-    for s in surfaces {
-        edges += s.edges()
-    }
-    println("Part 1: {}", edges)
+    let grid = makeGrid(cubes, size: max + 1)
+    println("Part 1: {}", part1(grid))
+    println("Part 2: {}", part2(grid))
 }
