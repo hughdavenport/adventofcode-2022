@@ -1,0 +1,70 @@
+import helpers { read_lines, panic }
+
+class Blueprint {
+    id: u64
+    costs: [String:[String:u64]]
+
+    public function parse(anon s: String) throws -> Blueprint {
+        let split = s.split(':')
+        let id = split[0].split(' ')[1].to_int()! as! u64
+        mut costs: [String:[String:u64]] = [:]
+        let rest_split = split[1].split('.')
+        for cost in rest_split {
+            mut dict: [String:u64] = [:]
+            let cost_split = cost.split(' ')
+            let name = cost_split[1]
+            mut idx = 4uz
+            while idx + 1 < cost_split.size() {
+                let num = cost_split[idx].to_int()! as! u64
+                let resource = cost_split[idx+1]
+                dict.set(resource, num)
+                idx += 3
+            }
+            costs.set(name, dict)
+        }
+        return Blueprint(id, costs)
+    }
+
+    public function getId(this) -> u64 => .id
+}
+
+class Node {
+    blueprint: Blueprint
+    robots: [String:u64]
+    resources: [String:u64]
+    minutes: u64
+
+    public function construct(blueprint: Blueprint) throws -> Node {
+        let robots = ["ore": 1u64]
+        let resources: [String:u64] = [:]
+        let minutes = 0u64
+        return Node(blueprint, robots, resources, minutes)
+    }
+
+    public function is_complete(this) -> bool {
+        return .minutes == 24
+    }
+
+    public function neighbours(this) throws -> [Node] {
+        mut ret: [Node] = []
+
+        if 1==1 {panic("TODO neighbours")}
+
+        return ret
+    }
+}
+
+function solve(node: Node) -> u64 {
+    panic("todo solve()")
+}
+
+function main(args: [String]) {
+    mut part1 = 0u64
+    for line in read_lines(filename: "input") {
+        let blueprint = Blueprint::parse(line)
+        let node = Node::construct(blueprint)
+        let result = solve(node)
+        part1 += blueprint.getId() * result
+    }
+    println("Part 1: {}", part1)
+}
