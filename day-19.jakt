@@ -4,6 +4,27 @@ class Blueprint {
     id: u64
     costs: [String:[String:u64]]
 
+    public function can_buy(this, resources: [String:u64]) throws -> [String:[String:u64]] {
+        mut ret: [String:[String:u64]] = [:]
+        for (t, d) in .costs {
+            mut ok = true
+            for (r, num) in d {
+                if not resources.contains(r) or resources[r] < num {
+                    ok = false
+                    break
+                }
+            }
+            if ok {
+                mut d_clone: [String:u64] = [:]
+                for (r, num) in d {
+                    d_clone.set(r, num)
+                }
+                ret.set(t, d_clone)
+            }
+        }
+        return ret
+    }
+
     public function parse(anon s: String) throws -> Blueprint {
         let split = s.split(':')
         let id = split[0].split(' ')[1].to_int()! as! u64
@@ -45,17 +66,74 @@ class Node {
         return .minutes == 24
     }
 
+    public function geodes(this) -> u64 {
+        guard .resources.contains("geode") else { return 0u64 }
+        return .resources["geode"]
+    }
+
+    function clone(this) throws -> Node {
+        let blueprint = .blueprint
+        mut robots: [String:u64] = [:]
+        mut resources: [String:u64] = [:]
+        for (typ, num) in .robots {
+            robots.set(typ, num)
+        }
+        for (typ, num) in .resources {
+            resources.set(typ, num)
+        }
+        let minutes = .minutes
+        return Node(blueprint, robots, resources, minutes)
+    }
+
+    function collect(mut this) throws {
+        for (typ, num) in .robots {
+            let res = .resources.get(typ)
+            .resources.set(typ, (res ?? 0) + num)
+        }
+        .minutes ++
+    }
+
     public function neighbours(this) throws -> [Node] {
         mut ret: [Node] = []
 
-        if 1==1 {panic("TODO neighbours")}
+        mut node = .clone()
+        node.collect()
+        ret.push(node)
+
+        for (robot, cost) in .blueprint.can_buy(resources: .resources) {
+            println("can buy {}", robot)
+            node = .clone()
+            node.collect()
+            for (typ, num) in cost {
+                node.resources.set(typ, node.resources[typ] - num)
+            }
+            let cur = node.robots.get(robot)
+            node.robots.set(robot, (cur ?? 0) + 1)
+            ret.push(node)
+        }
 
         return ret
     }
+
+    public function h(this) -> u64 => 0 // TODO
+    public function g(this) -> u64 => .geodes()
+    public function f(this) -> i64 => -(.g() + .h()) as! i64
+
+    public function hash(this) throws -> u32 {
+        return format("{}{}{}", .robots, .resources, .minutes).hash()
+    }
+
+    public function to_string(this) throws -> String {
+        return format("robots = {}, resources = {}, minutes = {}", .robots, .resources, .minutes)
+    }
 }
 
-function solve(node: Node) -> u64 {
-    panic("todo solve()")
+function solve(node: Node) throws -> u64 {
+    let ret = a_star(start: node)
+    if not ret.has_value() {
+        panic("could not get solution")
+    }
+    return ret!
 }
 
 function main(args: [String]) {
@@ -67,4 +145,151 @@ function main(args: [String]) {
         part1 += blueprint.getId() * result
     }
     println("Part 1: {}", part1)
+}
+
+function a_star(mut start: Node) throws -> u64? {
+    mut open = PriorityQueue()
+    open.insert(priority: 0, value: start)
+    // Still need weird u64's as can't use Node's in a Dictionary
+    mut gs = Dictionary<u32, u64?>()
+    let start_hash = start.hash()
+    gs[start_hash] = 0u64
+    mut fs = Dictionary<u32, u64?>()
+    fs[start_hash] = start.h()
+    while not open.is_empty() {
+        let current = open.peek()!
+        println("current = {}", current.to_string())
+        let current_hash = current.hash()
+        if current.is_complete() {
+            return Some(current.geodes())
+        }
+        let ignore = open.pop()
+        for n in current.neighbours() {
+            let n_hash = n.hash()
+            let g = gs[current_hash]! + 1
+            if not gs.contains(n_hash) or g < gs[n_hash]! {
+                gs[n_hash] = g
+                fs[n_hash] = g + n.h()
+                open.insert(priority: n.f(), value: n)
+            }
+        }
+    }
+    return None
+}
+struct ParentIterator implements(Iterable<usize>) {
+
+    idx: usize
+
+    function next(mut this) -> usize? {
+        guard .idx != 0 else {
+            return None
+        }
+
+        let ret = (.idx - 1) / 2
+        .idx = ret
+        return ret
+    }
+}
+class PriorityQueue {
+
+    public data: [(i64, Node)]? = None
+
+
+    public function insert(mut this, priority: i64, value: Node) throws {
+        ._initialize_if_needed()
+
+        .data!.push((priority, value))
+        ._sift_up(idx: .data!.size() - 1)
+    }
+
+    public // FIXME: This is needed to be public due to https://github.com/SerenityOS/jakt/issues/1301
+    function _sift_up(mut this, idx: usize) {
+        guard .data.has_value() and idx < .data!.size() else { return }
+        mut child_idx = idx
+        for parent_idx in ParentIterator(idx) {
+            let child = .data![child_idx].0
+            let parent = .data![parent_idx].0
+            if child >= parent {
+                break
+            }
+            ._swap(child_idx, parent_idx)
+            child_idx = parent_idx
+        }
+    }
+
+    public function pop(mut this) -> Node? {
+        guard .data.has_value() and .data!.size() > 0 else {
+            return None
+        }
+        if .data!.size() == 1 {
+            return .data!.pop()!.1
+        }
+
+        let ret = .data![0].1
+        ._remove(idx: 0)
+        return ret
+    }
+
+    public // FIXME: This is needed to be public due to https://github.com/SerenityOS/jakt/issues/1301
+    function _remove(mut this, idx: usize) {
+        guard .data.has_value() and idx < .data!.size() else { return }
+        guard idx < .data!.size() - 1 else {
+            let ignore = .data!.pop()
+            return
+        }
+        .data![idx] = .data!.pop()!
+        mut parent_idx = idx
+        while parent_idx < .data!.size() {
+            mut (left_idx, right_idx) = (parent_idx * 2 + 1, parent_idx * 2 + 2)
+            guard left_idx < .data!.size() else { break }
+            let parent = .data![parent_idx].0
+            let left = .data![left_idx].0
+            if left >= parent {
+                // left child is correct, check the right
+                guard right_idx < .data!.size() and .data![right_idx].0 < parent else { break }
+                // fall through to swap right
+            } else if right_idx >= .data!.size() or .data![right_idx].0 >= left {
+                // right is non-existent or bigger than left
+                ._swap(left_idx, parent_idx)
+                parent_idx = left_idx
+                continue
+            }
+            ._swap(right_idx, parent_idx)
+            parent_idx = right_idx
+        }
+    }
+
+
+    public function peek(this) -> Node? {
+        guard .data.has_value() and .data!.size() > 0 else {
+            return None
+        }
+        return .data![0].1
+    }
+
+    public function size(this) -> usize {
+        guard .data.has_value() else { return 0 }
+        return .data!.size()
+    }
+
+    public function is_empty(this) -> bool => .size() == 0
+
+    // Private functions
+
+    public // FIXME: This is needed to be public due to https://github.com/SerenityOS/jakt/issues/1301
+    function _initialize_if_needed(mut this) throws {
+        if .data.has_value() { return }
+        let data: [(i64,Node)] = []
+        .data = data
+    }
+
+    public // FIXME: This is needed to be public due to https://github.com/SerenityOS/jakt/issues/1301
+    function _swap(mut this, anon a: usize, anon b: usize) {
+        guard .data.has_value() and a < .data!.size() and b < .data!.size() else {
+            return
+        }
+        let tmp = .data![a]
+        .data![a] = .data![b]
+        .data![b] = tmp
+    }
 }
