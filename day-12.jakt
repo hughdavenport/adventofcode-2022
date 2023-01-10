@@ -48,7 +48,7 @@ struct Grid {
     }
 }
 
-struct Point implements(Hashable,Comparable<Point>,Equatable<Point>) {
+struct Point {
     x: i64
     y: i64
     goal_x: i64 = 0
@@ -88,25 +88,13 @@ struct Point implements(Hashable,Comparable<Point>,Equatable<Point>) {
     function h(this) -> i64 {
         return abs(.x - .goal_x) + abs(.y - .goal_y)
     }
-
-    function hash(this) -> u32 {
-        return .x * 10000 + .y
-    }
-
-    function compare(this, anon p: Point) -> i64 {
-        return this.f - p.f
-    }
-
-    function equals(this, anon other: Point) -> bool {
-        return this.x == other.x and this.y == other.y
-    }
 }
 
 function a_star(grid: Grid, mut start: Point, goal: Point) throws -> i64? {
-    mut open: HashablePriorityQueue<Point> = HashablePriorityQueue()
+    mut open = PriorityQueue()
     start.goal_x = goal.x
     start.goal_y = goal.y
-    open.push(start)
+    open.insert(priority: 0, value: start)
     // Still need weird i64's as can't use Point's in a Dictionary
     mut gs = Dictionary<i64, i64?>()
     gs[start.to_i64(grid)] = 0
@@ -125,14 +113,8 @@ function a_star(grid: Grid, mut start: Point, goal: Point) throws -> i64? {
             if not gs.contains(n_i) or g < gs[n_i]! {
                 gs[n_i] = g
                 fs[n_i] = g + n.h()
-                if not open.contains(n) {
-                    n.f = fs[n_i]!
-                    open.push(n)
-                } else {
-                    open.remove(n)
-                    n.f = fs[n_i]!
-                    open.push(n)
-                }
+                n.f = fs[n_i]!
+                open.insert(priority: n.f, value: n)
             }
         }
     }
@@ -151,207 +133,6 @@ function main(args: [String]) {
     }
     println("Part 2: {}", min)
 }
-trait Equatable<T> {
-    function equals(this, anon other: T) -> bool
-}
-trait Hashable {
-    function hash(this) -> u32
-}
-class MyList<T requires(Equatable<T>)> implements(IntoIterator<T>) {
-    public // have next as public as can't have inner class for iterator
-    next: MyList<T>? = None
-    public // have next as public as can't have inner class for iterator
-    data: T? = None
-
-    public function remove(mut this, anon val: T) -> bool {
-        guard .data.has_value() else {
-            return false
-        }
-        if .data!.equals(val) {
-            if .next.has_value() {
-                .data = .next!.data
-                .next = .next!.next
-            } else {
-                .data = None
-            }
-            return true
-        }
-        if .next.has_value() {
-            return .next!.remove(val)
-        }
-        return false
-    }
-
-    public function add(mut this, anon val: T) throws {
-        if not .data.has_value() {
-            .data = val
-            // .next = None // This should already be None if data was None
-            return
-        }
-        guard .next.has_value() else {
-            .next = MyList(data: val)
-            return
-        }
-        .next!.add(val)
-    }
-
-    public function contains(this, anon val: T) -> bool {
-        guard .data.has_value() else { return false }
-        if .data!.equals(val) { return true }
-        guard .next.has_value() else { return false }
-        return .next!.contains(val)
-    }
-
-    public function size(this) -> usize {
-        guard .data.has_value() else { return 0 }
-        guard .next.has_value() else { return 1 }
-        return 1 + .next!.size()
-    }
-    public function is_empty(this) -> bool => .size() == 0
-
-    public function iterator(this) -> Iterable<T> => MyListIterator(node: this)
-}
-
-struct MyListIterator<T> implements(Iterable<T>) {
-
-    node: MyList<T>?
-
-    function next(mut this) -> T? {
-        guard .node.has_value() else { return None }
-        let ret = .node!.data
-        .node = .node!.next as! MyList<T>?
-        return ret
-    }
-}
-
-class MySet<T requires(Equatable<T>,Hashable)> {
-    data: [u32: MyList<T>]? = None
-    // TODO have a capacity which grows and is used to mod key for better hash collision resistance
-
-    public function add(mut this, anon val: T) throws {
-        ._initialize_if_needed()
-
-        let idx = ._hash(val)
-        mut bucket = .data!.get(idx)
-        if not bucket.has_value() {
-            .data![idx] = MyList()
-            bucket = .data!.get(idx)
-        }
-        for v in bucket! {
-            if v.equals(val) { return }
-        }
-        bucket!.add(val)
-    }
-
-    public function remove(mut this, anon val: T) -> bool {
-        guard .data.has_value() else { return false }
-
-        let idx = ._hash(val)
-        mut bucket = .data!.get(idx)
-        guard bucket.has_value() else { return false }
-        let ret = bucket!.remove(val)
-        if ret and bucket!.is_empty() {
-            .data!.remove(idx)
-            return true
-        }
-        return ret
-    }
-
-    public function contains(this, anon val: T) -> bool {
-        guard .data.has_value() else { return false }
-
-        let idx = ._hash(val)
-        mut bucket = .data!.get(idx)
-        guard bucket.has_value() else { return false }
-        for v in bucket! {
-            if v.equals(val) { return true }
-        }
-        return false
-    }
-
-    public function size(this) -> usize {
-        guard .data.has_value() else { return 0 }
-        return .data!.size()
-    }
-    public function is_empty(this) -> bool => .size() == 0
-
-    // Private functions
-
-    public // FIXME: This is needed to be public due to https://github.com/SerenityOS/jakt/issues/1301
-    function _initialize_if_needed(mut this) throws {
-        if .data.has_value() { return }
-        let data: [u32: MyList<T>] = [:]
-        .data = data
-    }
-
-    public // FIXME: This is needed to be public due to https://github.com/SerenityOS/jakt/issues/1301
-    function _hash(this, anon val: T) -> u32 {
-        return val.hash() % 10 // Simulate collisions
-    }
-}
-
-class HashablePriorityQueue<T requires(Hashable)> {
-    // FIXME: really should extend from this...
-    public q: PriorityQueue<T>? = None
-    seen: MySet<T>? = None
-
-    public function push(mut this, anon val: T) throws {
-        // FIXME: need Super type and inherit, and just call Super._init inside our override
-        ._initialize_if_needed()
-        // FIXME: need Super type and inherit, and to use Super.push(val)
-        .q!.push(val)
-        .seen!.add(val)
-    }
-
-    public function pop(mut this) -> T? {
-        // FIXME: need Super type and inherit, and to use Super.pop
-        let ret = .q!.pop()
-        if ret.has_value() {
-            .seen!.remove(ret!)
-        }
-        return ret
-    }
-    public function peek(mut this) -> T? => .q!.peek()
-
-    public function remove(mut this, anon val: T) -> bool {
-        guard .q.has_value() else { return false }
-        .seen!.remove(val)
-        return .q!.remove(val)
-    }
-
-    public function contains(this, anon val: T) -> bool {
-        guard .seen.has_value() else { return false }
-        return .seen!.contains(val)
-    }
-
-    public function size(this) -> usize {
-        guard .q.has_value() else { return 0 }
-        return .q!.size()
-    }
-    public function is_empty(this) -> bool => .size() == 0
-
-    // Private functions
-
-    public // FIXME: This is needed to be public due to https://github.com/SerenityOS/jakt/issues/1301
-    function _initialize_if_needed(mut this) throws {
-        // FIXME: need Super type, then don't have __init, and just call Super._init
-        if not .q.has_value() {
-            .q = PriorityQueue()
-        }
-        .q!._initialize_if_needed()
-        if .seen.has_value() { return }
-        let seen: MySet<T> = MySet()
-        .seen = seen
-    }
-}
-
-
-
-trait Comparable<T> {
-    function compare(this, anon other: T) -> i64
-}
-
-
 struct ParentIterator implements(Iterable<usize>) {
 
     idx: usize
@@ -366,15 +147,15 @@ struct ParentIterator implements(Iterable<usize>) {
         return ret
     }
 }
-class PriorityQueue<T requires(Comparable<T>,Equatable<T>)> {
+class PriorityQueue {
 
-    public data: [T]? = None
+    public data: [(i64, Point)]? = None
 
 
-    public function push(mut this, anon val: T) throws {
+    public function insert(mut this, priority: i64, value: Point) throws {
         ._initialize_if_needed()
 
-        .data!.push(val)
+        .data!.push((priority, value))
         ._sift_up(idx: .data!.size() - 1)
     }
 
@@ -383,9 +164,9 @@ class PriorityQueue<T requires(Comparable<T>,Equatable<T>)> {
         guard .data.has_value() and idx < .data!.size() else { return }
         mut child_idx = idx
         for parent_idx in ParentIterator(idx) {
-            let child = .data![child_idx]
-            let parent = .data![parent_idx]
-            if child.compare(parent) >= 0 {
+            let child = .data![child_idx].0
+            let parent = .data![parent_idx].0
+            if child >= parent {
                 break
             }
             ._swap(child_idx, parent_idx)
@@ -393,31 +174,17 @@ class PriorityQueue<T requires(Comparable<T>,Equatable<T>)> {
         }
     }
 
-    public function pop(mut this) -> T? {
+    public function pop(mut this) -> Point? {
         guard .data.has_value() and .data!.size() > 0 else {
             return None
         }
         if .data!.size() == 1 {
-            return .data!.pop()!
+            return .data!.pop()!.1
         }
 
-        let ret = .data![0]
+        let ret = .data![0].1
         ._remove(idx: 0)
         return ret
-    }
-
-    public function remove(mut this, anon val: T) -> bool {
-        guard .data.has_value() else { return false }
-        mut idx = 0uz
-        while idx < .data!.size() {
-            if val.equals(.data![idx]) {
-                ._remove(idx)
-                ._sift_up(idx)
-                return true
-            }
-            idx ++
-        }
-        return false
     }
 
     public // FIXME: This is needed to be public due to https://github.com/SerenityOS/jakt/issues/1301
@@ -432,13 +199,13 @@ class PriorityQueue<T requires(Comparable<T>,Equatable<T>)> {
         while parent_idx < .data!.size() {
             mut (left_idx, right_idx) = (parent_idx * 2 + 1, parent_idx * 2 + 2)
             guard left_idx < .data!.size() else { break }
-            let parent = .data![parent_idx]
-            let left = .data![left_idx]
-            if left.compare(parent) >= 0 {
+            let parent = .data![parent_idx].0
+            let left = .data![left_idx].0
+            if left >= parent {
                 // left child is correct, check the right
-                guard right_idx < .data!.size() and .data![right_idx].compare(parent) < 0 else { break }
+                guard right_idx < .data!.size() and .data![right_idx].0 < parent else { break }
                 // fall through to swap right
-            } else if right_idx >= .data!.size() or .data![right_idx].compare(left) >= 0 {
+            } else if right_idx >= .data!.size() or .data![right_idx].0 >= left {
                 // right is non-existent or bigger than left
                 ._swap(left_idx, parent_idx)
                 parent_idx = left_idx
@@ -450,11 +217,11 @@ class PriorityQueue<T requires(Comparable<T>,Equatable<T>)> {
     }
 
 
-    public function peek(this) -> T? {
+    public function peek(this) -> Point? {
         guard .data.has_value() and .data!.size() > 0 else {
             return None
         }
-        return .data![0]
+        return .data![0].1
     }
 
     public function size(this) -> usize {
@@ -464,20 +231,12 @@ class PriorityQueue<T requires(Comparable<T>,Equatable<T>)> {
 
     public function is_empty(this) -> bool => .size() == 0
 
-    public function contains(this, anon val: T) -> bool {
-        guard .data.has_value() else { return false }
-        for v in .data! {
-            if v.equals(val) { return true }
-        }
-        return false
-    }
-
     // Private functions
 
     public // FIXME: This is needed to be public due to https://github.com/SerenityOS/jakt/issues/1301
     function _initialize_if_needed(mut this) throws {
         if .data.has_value() { return }
-        let data: [T] = []
+        let data: [(i64,Point)] = []
         .data = data
     }
 
@@ -489,9 +248,5 @@ class PriorityQueue<T requires(Comparable<T>,Equatable<T>)> {
         let tmp = .data![a]
         .data![a] = .data![b]
         .data![b] = tmp
-    }
-
-    public function set_data(mut this, data: [Point]?) {
-        .data = data as! [T]?
     }
 }
