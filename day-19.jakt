@@ -1,29 +1,22 @@
-import helpers { read_lines, panic }
+import helpers { read_lines, panic, max }
 
 class Blueprint {
     id: u64
-    costs: [String:[String:u64]]
+    public costs: [String:[String:u64]]
 
-    public function can_buy(this, resources: [String:u64]) throws -> [String:[String:u64]] {
-        mut ret: [String:[String:u64]] = [:]
-        for (t, d) in .costs {
-            mut ok = true
-            for (r, num) in d {
-                if not resources.contains(r) or resources[r] < num {
-                    ok = false
-                    break
-                }
-            }
-            if ok {
-                mut d_clone: [String:u64] = [:]
-                for (r, num) in d {
-                    d_clone.set(r, num)
-                }
-                ret.set(t, d_clone)
-            }
-        }
-        return ret
+    public function should_make_clay_or_ore(this, anon minutes_remaining: u64) -> bool {
+        let cost = .costs["geode"]["obsidian"]
+        mut min_minutes = 0u64
+        // FIXME if we had sqrt, this could be round((1+sqrt(1+8*cost))/2)
+        if cost > 10 { min_minutes = 6 }
+        if cost > 6 { min_minutes = 5 }
+        if cost > 3 { min_minutes = 4 }
+        if cost > 1 { min_minutes = 3 }
+        if cost > 0 { min_minutes = 2 }
+        return minutes_remaining > min_minutes + 2
     }
+
+    public function robots(this) throws -> [String] => .costs.keys()
 
     public function parse(anon s: String) throws -> Blueprint {
         let split = s.split(':')
@@ -62,8 +55,10 @@ class Node {
         return Node(blueprint, robots, resources, minutes)
     }
 
+    public function minutes_remaining(this) -> u64 => 24u64 - .minutes
+
     public function is_complete(this) -> bool {
-        return .minutes == 24
+        return .minutes_remaining() == 0
     }
 
     public function geodes(this) -> u64 {
@@ -96,20 +91,59 @@ class Node {
     public function neighbours(this) throws -> [Node] {
         mut ret: [Node] = []
 
-        mut node = .clone()
-        node.collect()
-        ret.push(node)
-
-        for (robot, cost) in .blueprint.can_buy(resources: .resources) {
-            println("can buy {}", robot)
-            node = .clone()
-            node.collect()
-            for (typ, num) in cost {
+        for robot in .blueprint.robots() {
+            if robot == "clay" or robot == "ore" {
+                guard .blueprint.should_make_clay_or_ore(.minutes_remaining()) else { continue }
+            }
+            guard .blueprint.costs.contains(robot) else { continue }
+            if robot != "geode" {
+                mut max_robots = 0u64
+                for (r, cost) in .blueprint.costs {
+                    guard cost.contains(robot) else { continue }
+                    max_robots = max(cost[robot] as! usize, max_robots as! usize) as! u64
+                }
+                guard (.robots.get(robot) ?? 0) < max_robots else { continue }
+            }
+            mut has_resources = true
+            mut has_robots = true
+            for (r, num) in .blueprint.costs[robot] {
+                if not .robots.contains(r) {
+                    has_robots = false
+                    break
+                }
+                if not .resources.contains(r) or .resources[r] < num {
+                    has_resources = false
+                    continue
+                }
+            }
+            guard has_robots else { continue }
+            mut node = .clone()
+            while not has_resources and not node.is_complete() {
+                node.collect()
+                has_resources = true
+                for (r, num) in node.blueprint.costs[robot] {
+                    if not node.resources.contains(r) or node.resources[r] < num {
+                        has_resources = false
+                        break
+                    }
+                }
+            }
+            guard not node.is_complete() else { continue }
+            for (typ, num) in node.blueprint.costs[robot] {
                 node.resources.set(typ, node.resources[typ] - num)
             }
+            node.collect()
             let cur = node.robots.get(robot)
             node.robots.set(robot, (cur ?? 0) + 1)
             ret.push(node)
+        }
+
+        if ret.is_empty() {
+            if .robots.contains("geode") {
+                mut node = .clone()
+                while not node.is_complete() { node.collect() }
+                ret.push(node)
+            }
         }
 
         return ret
@@ -129,11 +163,12 @@ class Node {
 }
 
 function solve(node: Node) throws -> u64 {
-    let ret = a_star(start: node)
-    if not ret.has_value() {
-        panic("could not get solution")
+    guard not node.is_complete() else { return node.geodes() }
+    mut ret = 0u64
+    for n in node.neighbours() {
+        ret = max(ret as! usize, solve(node: n) as! usize) as! u64
     }
-    return ret!
+    return ret
 }
 
 function main(args: [String]) {
