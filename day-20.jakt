@@ -1,0 +1,75 @@
+import helpers { read_lines, panic }
+
+class Node {
+    public value: i64
+    public next: Node? = None
+    public prev: Node? = None
+}
+
+function move_node(mut node: Node) {
+    guard node.value != 0 else { return }
+    node.next!.prev = node.prev
+    node.prev!.next = node.next
+    if node.value < 0 {
+        mut prev = node.prev
+        for i in 0..node.value {
+            prev = prev!.prev
+        }
+        node.prev = prev
+        node.next = prev!.next
+        prev!.next = node
+        node.next!.prev = node
+    } else {
+        mut next = node.next
+        for i in 0..node.value {
+            next = next!.next
+        }
+        node.next = next
+        node.prev = next!.prev
+        next!.prev = node
+        node.prev!.next = node
+    }
+}
+
+function mix(mut nodes: [Node]) {
+    for node in nodes {
+        move_node(node)
+    }
+}
+
+function find_zero(nodes: [Node]) -> Node {
+    for n in nodes {
+        if n.value == 0 { return n }
+    }
+    panic("Could not find 0")
+}
+
+function main(args: [String]) {
+    mut nodes: [Node] = []
+    for line in read_lines(filename: "input") {
+        let value = line.to_int()! as! i64
+        mut last = nodes.last()
+        let node = Node(value, prev: last)
+        if last.has_value() {
+            last!.next = Some(node)
+        }
+        nodes.push(node)
+    }
+    if not nodes.is_empty() {
+        mut first = nodes[0]
+        mut last = nodes[nodes.size()-1]
+        first.prev = Some(last)
+        last.next = Some(first)
+    }
+    mix(nodes)
+    let zero = find_zero(nodes)
+    mut node = zero
+    mut ret = 0
+    for j in 0..3 {
+        for i in 0..1000 {
+            node = node.next!
+        }
+        ret += node.value
+    }
+    println("Part 1: {}", ret)
+}
