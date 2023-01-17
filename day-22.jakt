@@ -59,12 +59,12 @@ enum Direction {
     }
 }
 
-class Position {
-    public x: usize
-    public y: usize
-    public direction: Direction
+struct Position {
+    x: usize
+    y: usize
+    direction: Direction
 
-    public function password(this) -> usize => 1000*.x + 4*.y + .direction.to_usize()
+    function password(this) -> usize => 1000*(.y+1) + 4*(.x+1) + .direction.to_usize()
 }
 
 struct Grid {
@@ -88,7 +88,7 @@ struct Grid {
         for y in 0..this.grid.size() {
             for x in 0..this.grid[y].size() {
                 if position.has_value() and position!.x == x and position!.y == y {
-                    builder.append_string("\e[1m")
+                    builder.append_string("\e[1;31m")
                     builder.append(position!.direction.to_byte())
                     builder.append_string("\e[m")
                 } else {
@@ -100,7 +100,7 @@ struct Grid {
         return builder.to_string()
     }
 
-    function first(this) throws -> Position {
+    function first(this) -> Position {
         let y = 0uz
         guard not .grid.is_empty() and not .grid[y].is_empty() else {
             panic("unreachable Grid::first() empty")
@@ -113,14 +113,92 @@ struct Grid {
         panic("unreachable Grid::first() none")
     }
 
-    function next(this, position: Position) -> Position? {
-        // TODO
-        // work out the next x,y based on dir
-        // if it is OUT() then look backwards for the other edge
-        // check that it isn't a wall
+    function _wrap(this, position: Position) -> (usize, usize) {
+        mut x = position.x
+        mut y = position.y
+        match position.direction {
+            RIGHT() => {
+                while x > 0 {
+                    x --
+                    if y + 1 > .grid.size() {
+                        x ++
+                        break
+                    }
+                    if .grid[y][x] is OUT() {
+                        x ++
+                        break
+                    }
+                }
+            }
+            LEFT() => {
+                while x + 2 < .grid[y].size() {
+                    x ++
+                    if y + 1 > .grid.size() {
+                        x --
+                        break
+                    }
+                    if .grid[y][x] is OUT() {
+                        x --
+                        break
+                    }
+                }
+            }
+            UP() => {
+                while y + 2 < .grid.size() {
+                    y ++
+                    if x + 1 > .grid[y].size() {
+                        y --
+                        break
+                    }
+                    if .grid[y][x] is OUT() {
+                        y --
+                        break
+                    }
+                }
+            }
+            DOWN() => {
+                while y > 0 {
+                    y --
+                    if x + 1 > .grid[y].size() {
+                        y ++
+                        break
+                    }
+                    if .grid[y][x] is OUT() {
+                        y ++
+                        break
+                    }
+                }
+            }
+        }
+        return (x, y)
+    }
 
-        panic("unimplemented Grid::next()")
-        //return None
+    function next(this, position: Position) -> Position? {
+        mut x = position.x + 1
+        mut y = position.y + 1
+        match position.direction {
+            RIGHT() => x++
+            LEFT() => x--
+            UP() => y--
+            DOWN() => y++
+        }
+        if x == 0 or y == 0 or y-1 >= .grid.size() or x-1 >= .grid[y-1].size() {
+            let t = ._wrap(position)
+            x = t.0
+            y = t.1
+        } else {
+            x--
+            y--
+        }
+        if .grid[y][x] is OUT() {
+            let t = ._wrap(position)
+            x = t.0
+            y = t.1
+        }
+        if .grid[y][x] is WALL() {
+            return None
+        }
+        return Position(x, y, direction: position.direction)
     }
 }
 
@@ -128,27 +206,27 @@ enum Instruction {
     Move(steps: i64)
     Rotate(b: u8)
 
-    function execute(this, grid: Grid, mut position: Position) throws {
-        match this {
-            Move(steps) => {
-                for i in 0..steps {
-                    let ret = grid.next(position)
-                    if not ret.has_value() {
-                        break
-                    }
-                    position = ret!
+    function execute(this, grid: Grid, mut position: Position) throws -> Position => match this {
+        Move(steps) => {
+            for i in 0..steps {
+                let ret = grid.next(position)
+                if not ret.has_value() {
+                    break
+                }
+                position = ret!
+            }
+            yield position
+        }
+        Rotate(b) => {
+            position.direction = match b {
+                b'R' => Direction::from_usize((position.direction.to_usize() + 1) % 4)
+                b'L' => Direction::from_usize((position.direction.to_usize() + 3) % 4)
+                else => {
+                    if 1==1 { panic(format("unreachable Direction::rotate(), invalid byte {:c}", b)) }
+                    yield Direction::RIGHT()
                 }
             }
-            Rotate(b) => {
-                position.direction = match b {
-                    b'R' => Direction::from_usize((position.direction.to_usize() + 1) % 4)
-                    b'L' => Direction::from_usize((position.direction.to_usize() + 3) % 4)
-                    else => {
-                        if 1==1 { panic(format("unreachable Direction::rotate(), invalid byte {:c}", b)) }
-                        yield Direction::RIGHT()
-                    }
-                }
-            }
+            yield position
         }
     }
 }
@@ -186,7 +264,7 @@ function main(args: [String]) {
     let directions = lines.last()!
     mut position = grid.first()
     for i in InstructionIterator::construct(lines.last()!) {
-        i.execute(grid, position)
+        position = i.execute(grid, position)
     }
     println("Part 1: {}", position.password())
 }

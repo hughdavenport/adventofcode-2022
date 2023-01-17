@@ -215,4 +215,3 @@ function main(args: [String]) {
     println("Part 2: {}", root.solve2(monkeys))
 }
 
-
