@@ -77,32 +77,128 @@ enum Equation {
         }
     }
 
-    function solve2(this, anon d: [String:Equation]) -> i64? {
+    function rearrange(this, anon mut d: [String:Equation], other: String) throws -> (String, String) {
+        // a op b == other
+        // assumes one of a or b fail, e.g if a failed rearrange so a = other op2 b, or vice versa
         let (r_a, r_b, a, b) = match this {
             Add(a, b) => _solve2(d, a, b)
             Minus(a, b) => _solve2(d, a, b)
             Multiply(a, b) => _solve2(d, a, b)
             Divide(a, b) => _solve2(d, a, b)
             else => {
-                if 1==1 {panic("unreachable: Equation::solve")}
+                if 1==1 {panic("unreachable: Equation::rearrange() unsupported type")}
                 yield (None, None, "", "")
             }
         }
-                println("t = {}", (r_a, r_b, a, b))
         if not r_a.has_value() {
-            if a == "humn" {
-                return r_b
-            }
-            // FIXME do actual solving of equation
-            return d[a].solve2(d)
+            return (a, match this {
+                // none + b = other
+                // none = other - b
+                Add() => {
+                    let eq = Equation::Minus(a: other, b)
+                    let ret = format("({}-{})", other, b)
+                    d.set(ret, eq)
+                    yield ret
+                }
+                // none - b = other
+                // none = other + b
+                Minus() => {
+                    let eq = Equation::Add(a: other, b)
+                    let ret = format("({}+{})", other, b)
+                    d.set(ret, eq)
+                    yield ret
+                }
+                // none * b = other
+                // none = other / b
+                Multiply() => {
+                    let eq = Equation::Divide(a: other, b)
+                    let ret = format("({}/{})", other, b)
+                    d.set(ret, eq)
+                    yield ret
+                }
+                // none / b = other
+                // none = other * b
+                Divide() => {
+                    let eq = Equation::Multiply(a: other, b)
+                    let ret = format("({}*{})", other, b)
+                    d.set(ret, eq)
+                    yield ret
+                }
+                else => {
+                    if 1==1 {panic("unreachable: Equation::rearrange() not a")}
+                    yield ""
+                }
+            })
         } else if not r_b.has_value() {
-            if b == "humn" {
-                return r_a
-            }
-            // FIXME do actual solving of equation
-            return d[b].solve2(d)
+            return (b, match this {
+                // a + none = other
+                // none = other - a
+                Add() => {
+                    let eq = Equation::Minus(a: other, b: a)
+                    let ret = format("({}-{})", other, a)
+                    d.set(ret, eq)
+                    yield ret
+                }
+                // a - none = other
+                // none = a - other
+                Minus() => {
+                    let eq = Equation::Minus(a, b: other)
+                    let ret = format("({}-{})", a, other)
+                    d.set(ret, eq)
+                    yield ret
+                }
+                // a * none = other
+                // none = other / a
+                Multiply() => {
+                    let eq = Equation::Divide(a: other, b: a)
+                    let ret = format("({}/{})", other, a)
+                    d.set(ret, eq)
+                    yield ret
+                }
+                // a / none = other
+                // none = a / other
+                Divide() => {
+                    let eq = Equation::Divide(a, b: other)
+                    let ret = format("({}/{})", a, other)
+                    d.set(ret, eq)
+                    yield ret
+                }
+                else => {
+                    if 1==1 {panic("unreachable: Equation::rearrange() not b")}
+                    yield ""
+                }
+            })
+        } else {
+            panic("unreachable: Equation::rearrange() no unknowns")
         }
-        return None
+    }
+
+    function solve2(this, anon mut d: [String:Equation]) throws -> i64? {
+        let (r_a, r_b, a, b) = match this {
+            Add(a, b) => _solve2(d, a, b)
+            Minus(a, b) => _solve2(d, a, b)
+            Multiply(a, b) => _solve2(d, a, b)
+            Divide(a, b) => _solve2(d, a, b)
+            else => {
+                if 1==1 {panic("unreachable: Equation::solve2")}
+                yield (None, None, "", "")
+            }
+        }
+        mut lhs = ""
+        mut other = ""
+        if not r_a.has_value() {
+            lhs = a
+            other = b
+        } else if not r_b.has_value() {
+            lhs = b
+            other = a
+        }
+        while lhs != "humn" {
+            let t = d[lhs].rearrange(d, other)
+            lhs = t.0
+            other = t.1
+        }
+        return d[other].solve(d)
     }
 }
 
