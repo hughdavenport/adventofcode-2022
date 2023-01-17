@@ -1,4 +1,4 @@
-import helpers { read_lines, panic }
+import helpers { read_lines, panic, is_digit }
 
 enum Cell {
     OUT()
@@ -40,6 +40,17 @@ enum Direction {
         UP() => 3uz
     }
 
+    function from_usize(anon u: usize) throws -> Direction => match u {
+        0uz => Direction::RIGHT()
+        1uz => Direction::DOWN()
+        2uz => Direction::LEFT()
+        3uz => Direction::UP()
+        else => {
+            if 1==1 { panic(format("unreachable Direction::from_usize(), invalid input {}", u)) }
+            yield Direction::RIGHT()
+        }
+    }
+
     function to_byte(this) -> u8 => match this {
         RIGHT() => b'>'
         DOWN() => b'v'
@@ -48,12 +59,12 @@ enum Direction {
     }
 }
 
-struct Position {
-    x: usize
-    y: usize
-    direction: Direction
+class Position {
+    public x: usize
+    public y: usize
+    public direction: Direction
 
-    function password(this) -> usize => 1000*.x + 4*.y + .direction.to_usize()
+    public function password(this) -> usize => 1000*.x + 4*.y + .direction.to_usize()
 }
 
 struct Grid {
@@ -89,7 +100,7 @@ struct Grid {
         return builder.to_string()
     }
 
-    function first(this) -> Position {
+    function first(this) throws -> Position {
         let y = 0uz
         guard not .grid.is_empty() and not .grid[y].is_empty() else {
             panic("unreachable Grid::first() empty")
@@ -102,21 +113,80 @@ struct Grid {
         panic("unreachable Grid::first() none")
     }
 
-    function next(this, position: Position) -> Position {
+    function next(this, position: Position) -> Position? {
         // TODO
         // work out the next x,y based on dir
         // if it is OUT() then look backwards for the other edge
         // check that it isn't a wall
 
         panic("unimplemented Grid::next()")
+        //return None
+    }
+}
+
+enum Instruction {
+    Move(steps: i64)
+    Rotate(b: u8)
+
+    function execute(this, grid: Grid, mut position: Position) throws {
+        match this {
+            Move(steps) => {
+                for i in 0..steps {
+                    let ret = grid.next(position)
+                    if not ret.has_value() {
+                        break
+                    }
+                    position = ret!
+                }
+            }
+            Rotate(b) => {
+                position.direction = match b {
+                    b'R' => Direction::from_usize((position.direction.to_usize() + 1) % 4)
+                    b'L' => Direction::from_usize((position.direction.to_usize() + 3) % 4)
+                    else => {
+                        if 1==1 { panic(format("unreachable Direction::rotate(), invalid byte {:c}", b)) }
+                        yield Direction::RIGHT()
+                    }
+                }
+            }
+        }
+    }
+}
+
+class InstructionIterator implements(Iterable<Instruction>) {
+    s: String
+    idx: usize = 0uz
+
+    public function construct(anon s: String) throws -> InstructionIterator {
+        return InstructionIterator(s)
+    }
+
+    public function next(mut this) -> Instruction? {
+        guard .idx < .s.length() else { return None }
+        let b = .s.byte_at(.idx)
+        .idx ++
+        return match b {
+            b'R' | b'L' => Instruction::Rotate(b)
+            else => {
+                mut steps = (b - b'0') as! i64
+                while .idx < .s.length() and is_digit(.s.byte_at(.idx)) {
+                    steps *= 10
+                    steps += (.s.byte_at(.idx) - b'0') as! i64
+                    .idx ++
+                }
+                yield Instruction::Move(steps)
+            }
+        }
     }
 }
 
 function main(args: [String]) {
     let lines = read_lines(filename: "input")
     let grid = Grid::parse(lines)
-    let directions = lines.last()
+    let directions = lines.last()!
     mut position = grid.first()
-    // TODO go through all the positions
+    for i in InstructionIterator::construct(lines.last()!) {
+        i.execute(grid, position)
+    }
     println("Part 1: {}", position.password())
 }

@@ -56,3 +56,4 @@ function max(anon a: usize, anon b: usize) -> usize {
     }
     return b
 }
+function is_digit(anon b: u8) -> bool => b >= b'0' and b <= b'9'
