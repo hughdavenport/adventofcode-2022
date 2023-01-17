@@ -6,13 +6,13 @@ class Node {
     public prev: Node? = None
 }
 
-function move_node(mut node: Node) {
-    guard node.value != 0 else { return }
+function move_node(mut node: Node, mod: i64) {
+    guard (node.value % mod) != 0 else { return }
     node.next!.prev = node.prev
     node.prev!.next = node.next
     if node.value < 0 {
         mut prev = node.prev
-        for i in 0..node.value {
+        for i in 0..(node.value % mod) {
             prev = prev!.prev
         }
         node.prev = prev
@@ -21,7 +21,7 @@ function move_node(mut node: Node) {
         node.next!.prev = node
     } else {
         mut next = node.next
-        for i in 0..node.value {
+        for i in 0..(node.value % mod) {
             next = next!.next
         }
         node.next = next
@@ -33,7 +33,7 @@ function move_node(mut node: Node) {
 
 function mix(mut nodes: [Node]) {
     for node in nodes {
-        move_node(node)
+        move_node(node, mod: (nodes.size()-1) as! i64)
     }
 }
 
@@ -55,21 +55,50 @@ function main(args: [String]) {
         }
         nodes.push(node)
     }
+    mut nodes2: [Node] = []
     if not nodes.is_empty() {
-        mut first = nodes[0]
-        mut last = nodes[nodes.size()-1]
-        first.prev = Some(last)
-        last.next = Some(first)
-    }
-    mix(nodes)
-    let zero = find_zero(nodes)
-    mut node = zero
-    mut ret = 0
-    for j in 0..3 {
-        for i in 0..1000 {
-            node = node.next!
+        mut first = nodes.first()
+        mut last = nodes.last()
+        first!.prev = last
+        last!.next = first
+        for n in nodes {
+            let value = n.value * 811589153
+            last = nodes2.last()
+            let node = Node(value, prev: last)
+            if last.has_value() {
+                last!.next = Some(node)
+            }
+            nodes2.push(node)
         }
-        ret += node.value
+        first = nodes2.first()
+        last = nodes2.last()
+        first!.prev = last
+        last!.next = first
     }
-    println("Part 1: {}", ret)
+    {
+        mix(nodes)
+        let zero = find_zero(nodes)
+        mut node = zero
+        mut ret = 0
+        for j in 0..3 {
+            for i in 0..1000 {
+                node = node.next!
+            }
+            ret += node.value
+        }
+        println("Part 1: {}", ret)
+    }
+    {
+        for i in 0..10 { mix(nodes: nodes2) }
+        let zero = find_zero(nodes: nodes2)
+        mut node = zero
+        mut ret = 0
+        for j in 0..3 {
+            for i in 0..1000 {
+                node = node.next!
+            }
+            ret += node.value
+        }
+        println("Part 2: {}", ret)
+    }
 }
