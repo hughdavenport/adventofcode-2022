@@ -1,0 +1,122 @@
+import helpers { read_lines, panic }
+
+enum Cell {
+    OUT()
+    FLOOR()
+    WALL()
+    UNKNOWN()
+
+    function from_byte(anon b: u8) throws -> Cell => match b {
+        b' ' => Cell::OUT()
+        b'.' => Cell::FLOOR()
+        b'#' => Cell::WALL()
+        else => {
+            if 1==1 { panic(format("unreachable Cell::from_byte(), unknown byte {:c}", b)) }
+            yield Cell::UNKNOWN()
+        }
+    }
+
+    function to_byte(this) -> u8 => match this {
+        OUT() => b' '
+        FLOOR() => b'.'
+        WALL() => b'#'
+        UNKNOWN() => {
+            if 1==1 { panic("unreachable Cell::to_byte(), unknown type") }
+            yield 0u8
+        }
+    }
+}
+
+enum Direction {
+    RIGHT
+    DOWN
+    LEFT
+    UP
+
+    function to_usize(this) -> usize => match this {
+        RIGHT() => 0uz
+        DOWN() => 1uz
+        LEFT() => 2uz
+        UP() => 3uz
+    }
+
+    function to_byte(this) -> u8 => match this {
+        RIGHT() => b'>'
+        DOWN() => b'v'
+        LEFT() => b'<'
+        UP() => b'^'
+    }
+}
+
+struct Position {
+    x: usize
+    y: usize
+    direction: Direction
+
+    function password(this) -> usize => 1000*.x + 4*.y + .direction.to_usize()
+}
+
+struct Grid {
+    grid: [[Cell]]
+
+    function parse(anon lines: [String]) throws -> Grid {
+        mut grid: [[Cell]] = []
+        for line in lines {
+            if line.length() == 0 { break }
+            mut row: [Cell] = []
+            for i in 0..line.length() {
+                row.push(Cell::from_byte(line.byte_at(i)))
+            }
+            grid.push(row)
+        }
+        return Grid(grid)
+    }
+
+    function to_string(this, position: Position? = None) throws -> String {
+        mut builder = StringBuilder::create()
+        for y in 0..this.grid.size() {
+            for x in 0..this.grid[y].size() {
+                if position.has_value() and position!.x == x and position!.y == y {
+                    builder.append_string("\e[1m")
+                    builder.append(position!.direction.to_byte())
+                    builder.append_string("\e[m")
+                } else {
+                    builder.append(.grid[y][x].to_byte())
+                }
+            }
+            builder.append(b'\n')
+        }
+        return builder.to_string()
+    }
+
+    function first(this) -> Position {
+        let y = 0uz
+        guard not .grid.is_empty() and not .grid[y].is_empty() else {
+            panic("unreachable Grid::first() empty")
+        }
+        for x in 0..this.grid[y].size() {
+            if .grid[y][x] is FLOOR() {
+                return Position(x, y, direction: Direction::RIGHT)
+            }
+        }
+        panic("unreachable Grid::first() none")
+    }
+
+    function next(this, position: Position) -> Position {
+        // TODO
+        // work out the next x,y based on dir
+        // if it is OUT() then look backwards for the other edge
+        // check that it isn't a wall
+
+        panic("unimplemented Grid::next()")
+    }
+}
+
+function main(args: [String]) {
+    let lines = read_lines(filename: "input")
+    let grid = Grid::parse(lines)
+    let directions = lines.last()
+    mut position = grid.first()
+    // TODO go through all the positions
+    println("Part 1: {}", position.password())
+}
