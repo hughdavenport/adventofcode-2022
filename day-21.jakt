@@ -1,0 +1,54 @@
+import helpers { read_lines, panic }
+
+enum Equation {
+    Constant(value: i64)
+    Add(a: String, b: String)
+    Minus(a: String, b: String)
+    Multiply(a: String, b: String)
+    Divide(a: String, b: String)
+
+    UNKNOWN()
+
+    function parse(anon s: String) throws -> Equation {
+        let value = s.to_int()
+        if value.has_value() {
+            return Equation::Constant(value: value! as! i64)
+        }
+        let split = s.split(' ')
+        return match split[1] {
+            "+" => Equation::Add(a: split[0], b: split[2])
+            "-" => Equation::Minus(a: split[0], b: split[2])
+            "*" => Equation::Multiply(a: split[0], b: split[2])
+            "/" => Equation::Divide(a: split[0], b: split[2])
+            else => {
+                if 1==1 {panic("unreachable: Equation::parse")}
+                yield Equation::UNKNOWN()
+            }
+        }
+    }
+
+    function solve(this, anon d: [String:Equation]) -> i64 {
+        let ret = match this {
+            Constant(value) => value
+            Add(a, b) => d[a].solve(d) + d[b].solve(d)
+            Minus(a, b) => d[a].solve(d) - d[b].solve(d)
+            Multiply(a, b) => d[a].solve(d) * d[b].solve(d)
+            Divide(a, b) => d[a].solve(d) / d[b].solve(d)
+            else => {
+                if 1==1 {panic("unreachable: Equation::solve")}
+                yield 0
+            }
+        }
+        return ret
+    }
+}
+
+
+function main(args: [String]) {
+    mut monkeys: [String:Equation] = [:]
+    for line in read_lines(filename: "input") {
+        let split = line.split(':')
+        monkeys.set(split[0], Equation::parse(split[1]))
+    }
+    println("Part 1: {}", monkeys["root"].solve(monkeys))
+}
