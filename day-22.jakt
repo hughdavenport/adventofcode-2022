@@ -67,11 +67,73 @@ struct Position {
     function password(this) -> usize => 1000*(.y+1) + 4*(.x+1) + .direction.to_usize()
 }
 
-struct Grid {
-    grid: [[Cell]]
-    cube: bool = false
+class Cube : Grid {
+    faces: [CubeFace]
 
-    function parse(anon lines: [String]) throws -> Grid {
+    // FIXME this is public due to bug #1324
+    public function _wrap(this, position: Position) -> Position {
+        panic("unimplemented: Cube::_wrap()")
+    }
+}
+
+class CubeFace {
+    position: Position
+    north: CubeFace? = None
+    south: CubeFace? = None
+    west: CubeFace? = None
+    east: CubeFace? = None
+
+    public function fold(mut this, grid: Grid) throws -> Cube {
+        mut size = 50uz
+        if grid.grid.size() == 12 {
+            size = 4uz
+        }
+
+        mut c = CubeFace(position: .position)
+        c.position.x += size
+        if c.position.x >= grid.grid[c.position.y].size() {
+            c.position.x = .position.x
+            c.position.y += size
+            .south = c
+        } else if grid.grid[c.position.y][c.position.x] is OUT() {
+            c.position.x = .position.x
+            c.position.y += size
+            .south = c
+        } else {
+            .east = c
+        }
+        // TODO do more? recurse?
+
+        if 1==1 { panic("todo cubeface fold recurse") }
+
+        mut faces: [CubeFace] = []
+        faces.push(this)
+        faces.push(.north!)
+        faces.push(.south!)
+        faces.push(.west!)
+        faces.push(.east!)
+        faces.push(.north!.north!)
+        return Cube(grid: grid.grid, faces)
+    }
+}
+
+class Grid {
+    public grid: [[Cell]]
+
+    public function fold(this) throws -> Cube {
+        mut size = 50uz
+        if .grid.size() == 12 {
+            size = 4uz
+        }
+
+        mut position = .first()
+        position.x -= position.x % size
+        position.direction = Direction::UP()
+        mut top = CubeFace(position)
+        return top.fold(grid: this)
+    }
+
+    public function parse(anon lines: [String]) throws -> Grid {
         mut grid: [[Cell]] = []
         for line in lines {
             if line.length() == 0 { break }
@@ -84,7 +146,7 @@ struct Grid {
         return Grid(grid)
     }
 
-    function to_string(this, position: Position? = None) throws -> String {
+    public function to_string(this, position: Position? = None) throws -> String {
         mut builder = StringBuilder::create()
         for y in 0..this.grid.size() {
             for x in 0..this.grid[y].size() {
@@ -101,7 +163,7 @@ struct Grid {
         return builder.to_string()
     }
 
-    function first(this) -> Position {
+    public function first(this) -> Position {
         let y = 0uz
         guard not .grid.is_empty() and not .grid[y].is_empty() else {
             panic("unreachable Grid::first() empty")
@@ -114,15 +176,10 @@ struct Grid {
         panic("unreachable Grid::first() none")
     }
 
-    function _wrap(this, position: Position) -> Position {
-        if .cube {
-            if .grid.size() == 12 {
-                println("face size = 4")
-            } else {
-                println("face size = 50")
-            }
-            println("wrapping from {}", position)
-            panic("unimplemented Grid::_wrap() cube")
+    // FIXME this has an optional cube param due to bug #1324
+    function _wrap(this, position: Position, cube: Cube? = None) -> Position {
+        if cube.has_value() {
+            return cube!._wrap(position)
         }
         mut x = position.x
         mut y = position.y
@@ -184,7 +241,8 @@ struct Grid {
         return Position(x, y, direction)
     }
 
-    function next(this, position: Position) -> Position? {
+    // FIXME this has an optional cube param due to bug #1324
+    public function next(this, position: Position, cube: Cube? = None) -> Position? {
         mut x = position.x + 1
         mut y = position.y + 1
         mut direction = position.direction
@@ -195,7 +253,8 @@ struct Grid {
             DOWN() => y++
         }
         if x == 0 or y == 0 or y-1 >= .grid.size() or x-1 >= .grid[y-1].size() {
-            let wrapped = ._wrap(position)
+            // FIXME this has an optional cube param due to bug #1324
+            let wrapped = ._wrap(position, cube)
             x = wrapped.x
             y = wrapped.y
             direction = wrapped.direction
@@ -204,7 +263,8 @@ struct Grid {
             y--
         }
         if .grid[y][x] is OUT() {
-            let wrapped = ._wrap(position)
+            // FIXME this has an optional cube param due to bug #1324
+            let wrapped = ._wrap(position, cube)
             x = wrapped.x
             y = wrapped.y
             direction = wrapped.direction
@@ -220,10 +280,12 @@ enum Instruction {
     Move(steps: i64)
     Rotate(b: u8)
 
-    function execute(this, grid: Grid, mut position: Position, debug: bool = false) throws -> Position => match this {
+    // FIXME this has an optional cube param due to bug #1324
+    function execute(this, grid: Grid, cube: Cube? = None, mut position: Position, debug: bool = false) throws -> Position => match this {
         Move(steps) => {
             for i in 0..steps {
-                let ret = grid.next(position)
+                // FIXME this has an optional cube param due to bug #1324
+                let ret = grid.next(position, cube)
                 if not ret.has_value() {
                     break
                 }
@@ -283,16 +345,17 @@ class InstructionIterator implements(Iterable<Instruction>) {
 
 function main(args: [String]) {
     let lines = read_lines(filename: "input")
-    mut grid = Grid::parse(lines)
+    let grid = Grid::parse(lines)
     let directions = lines.last()!
     mut position = grid.first()
     for i in InstructionIterator::construct(lines.last()!) {
         position = i.execute(grid, position)
     }
     println("Part 1: {}", position.password())
-    grid.cube = true
-    position = grid.first()
+    let cube = grid.fold()
+    position = cube.first()
     for i in InstructionIterator::construct(lines.last()!) {
-        position = i.execute(grid, position, debug: true)
+        // FIXME this has an optional cube param due to bug #1324
+        position = i.execute(grid: cube, cube, position, debug: true)
     }
 }
