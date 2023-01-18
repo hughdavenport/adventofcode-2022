@@ -69,6 +69,7 @@ struct Position {
 
 struct Grid {
     grid: [[Cell]]
+    cube: bool = false
 
     function parse(anon lines: [String]) throws -> Grid {
         mut grid: [[Cell]] = []
@@ -113,10 +114,20 @@ struct Grid {
         panic("unreachable Grid::first() none")
     }
 
-    function _wrap(this, position: Position) -> (usize, usize) {
+    function _wrap(this, position: Position) -> Position {
+        if .cube {
+            if .grid.size() == 12 {
+                println("face size = 4")
+            } else {
+                println("face size = 50")
+            }
+            println("wrapping from {}", position)
+            panic("unimplemented Grid::_wrap() cube")
+        }
         mut x = position.x
         mut y = position.y
-        match position.direction {
+        let direction = position.direction
+        match direction {
             RIGHT() => {
                 while x > 0 {
                     x --
@@ -170,12 +181,13 @@ struct Grid {
                 }
             }
         }
-        return (x, y)
+        return Position(x, y, direction)
     }
 
     function next(this, position: Position) -> Position? {
         mut x = position.x + 1
         mut y = position.y + 1
+        mut direction = position.direction
         match position.direction {
             RIGHT() => x++
             LEFT() => x--
@@ -183,22 +195,24 @@ struct Grid {
             DOWN() => y++
         }
         if x == 0 or y == 0 or y-1 >= .grid.size() or x-1 >= .grid[y-1].size() {
-            let t = ._wrap(position)
-            x = t.0
-            y = t.1
+            let wrapped = ._wrap(position)
+            x = wrapped.x
+            y = wrapped.y
+            direction = wrapped.direction
         } else {
             x--
             y--
         }
         if .grid[y][x] is OUT() {
-            let t = ._wrap(position)
-            x = t.0
-            y = t.1
+            let wrapped = ._wrap(position)
+            x = wrapped.x
+            y = wrapped.y
+            direction = wrapped.direction
         }
         if .grid[y][x] is WALL() {
             return None
         }
-        return Position(x, y, direction: position.direction)
+        return Position(x, y, direction)
     }
 }
 
@@ -206,7 +220,7 @@ enum Instruction {
     Move(steps: i64)
     Rotate(b: u8)
 
-    function execute(this, grid: Grid, mut position: Position) throws -> Position => match this {
+    function execute(this, grid: Grid, mut position: Position, debug: bool = false) throws -> Position => match this {
         Move(steps) => {
             for i in 0..steps {
                 let ret = grid.next(position)
@@ -214,6 +228,12 @@ enum Instruction {
                     break
                 }
                 position = ret!
+                if debug {
+                    println("{}", grid.to_string(position))
+                }
+            }
+            if debug {
+                println("{}", grid.to_string(position))
             }
             yield position
         }
@@ -225,6 +245,9 @@ enum Instruction {
                     if 1==1 { panic(format("unreachable Direction::rotate(), invalid byte {:c}", b)) }
                     yield Direction::RIGHT()
                 }
+            }
+            if debug {
+                println("{}", grid.to_string(position))
             }
             yield position
         }
@@ -260,11 +283,16 @@ class InstructionIterator implements(Iterable<Instruction>) {
 
 function main(args: [String]) {
     let lines = read_lines(filename: "input")
-    let grid = Grid::parse(lines)
+    mut grid = Grid::parse(lines)
     let directions = lines.last()!
     mut position = grid.first()
     for i in InstructionIterator::construct(lines.last()!) {
         position = i.execute(grid, position)
     }
     println("Part 1: {}", position.password())
+    grid.cube = true
+    position = grid.first()
+    for i in InstructionIterator::construct(lines.last()!) {
+        position = i.execute(grid, position, debug: true)
+    }
 }
